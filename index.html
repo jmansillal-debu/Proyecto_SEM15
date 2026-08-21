@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNO Classic Online</title>
-  
-  <!-- Carga de Fuentes Google Fonts requeridas por CSS -->
+
+  <!-- Fuentes de Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@600;900&display=swap" rel="stylesheet">
 
-  <!-- Hoja de Estilos -->
-  <link rel="stylesheet" href="./style.css?v=5.0">
-  
+  <!-- Estilos -->
+  <link rel="stylesheet" href="./style.css?v=6.0">
+
   <!-- Firebase SDK Compat -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -24,11 +24,11 @@
     <div class="felt-texture"></div>
   </div>
 
-  <!-- PANTALLA INICIAL / MENÚ -->
+  <!-- PANTALLA INICIAL / MENÚ PRINCIPAL -->
   <div id="screen-menu" class="screen active">
     <div class="login-wrapper">
-      
-      <!-- REGLAS DE JUEGO -->
+
+      <!-- CONTENEDOR 1: REGLAS DEL JUEGO -->
       <div class="wood-card">
         <div class="card-header amber">
           <h2>Reglas del Juego</h2>
@@ -50,7 +50,7 @@
         </div>
       </div>
 
-      <!-- MENÚ DE INGRESO -->
+      <!-- CONTENEDOR 2: LOGIN Y UNIÓN -->
       <div class="wood-card">
         <div class="card-header red">
           <h1>UNO CLASSIC</h1>
@@ -61,7 +61,7 @@
             <label for="player-name-input">Tu Apodo</label>
             <input type="text" id="player-name-input" placeholder="Ej: Pedro" maxlength="12">
           </div>
-          
+
           <div class="actions-stack">
             <button onclick="createRoom()" class="btn btn-primary">Crear Mesa</button>
             <div class="divider"><span>O ÚNETE A UNA</span></div>
@@ -73,7 +73,7 @@
         </div>
       </div>
 
-      <!-- HISTORIAL DE GANADORES -->
+      <!-- CONTENEDOR 3: HISTORIAL DE GANADORES -->
       <div class="wood-card">
         <div class="card-header gold">
           <h2>🏆 Ganadores</h2>
@@ -122,24 +122,25 @@
       </div>
     </div>
 
-    <!-- ZONA OPONENTES -->
-    <div id="opponents-zone" class="opponents-board"></div>
+    <!-- ÁREA PRINCIPAL DE LA MESA CON OPONENTES DISTRIBUIDOS -->
+    <div class="table-play-area">
+      <div id="opponents-zone" class="opponents-board"></div>
 
-    <!-- MESA CENTRAL -->
-    <div class="table-center">
-      <div class="deck-spot" onclick="drawCardCurrentPlayer()">
-        <div class="unocard card-back">
-          <div class="card-inner">UNO</div>
+      <div class="table-center">
+        <div class="deck-spot" onclick="drawCardCurrentPlayer()">
+          <div class="unocard card-back">
+            <div class="card-inner">UNO</div>
+          </div>
+          <span class="deck-label">Comer</span>
         </div>
-        <span class="deck-label">Comer</span>
-      </div>
-      
-      <div class="discard-spot">
-        <div id="top-card" class="unocard"></div>
+
+        <div class="discard-spot">
+          <div id="top-card" class="unocard"></div>
+        </div>
       </div>
     </div>
 
-    <!-- MANO Y CONTROLES DEL JUGADOR -->
+    <!-- DOCK Y MANO DEL JUGADOR -->
     <div class="player-dock">
       <div class="dock-header">
         <span>Tus cartas (<span id="my-card-count">0</span>)</span>
@@ -161,12 +162,12 @@
       </div>
     </div>
 
-    <!-- FLOTANTE CHAT DE LA SALA -->
+    <!-- CHAT EN TIEMPO REAL -->
     <div id="chat-widget" class="chat-widget">
       <button class="chat-toggle" onclick="toggleChat()">
         💬 <span id="chat-badge" class="chat-badge">0</span>
       </button>
-      
+
       <div id="chat-box" class="chat-box hidden">
         <div class="chat-header">
           <span>Chat de la Sala</span>
@@ -181,6 +182,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=5.0"></script>
+  <script src="./app.js?v=6.0"></script>
 </body>
 </html>

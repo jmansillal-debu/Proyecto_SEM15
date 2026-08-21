@@ -71,7 +71,7 @@ function registerWinner(winnerName) {
 function createRoom() {
   const name = document.getElementById('player-name-input').value.trim();
   if (!name) return alert("Ingresa tu apodo.");
-  
+
   localState.playerName = name;
   localState.playerId = 'p_' + Math.random().toString(36).substring(2, 7);
   localState.roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -104,7 +104,7 @@ function joinRoom() {
 
   db.ref(`rooms/${code}`).once('value', snapshot => {
     if (!snapshot.exists()) return alert("Mesa no encontrada.");
-    
+
     db.ref(`rooms/${code}/players/${localState.playerId}`).set({
       name, hand: [], id: localState.playerId
     }).then(() => {
@@ -115,12 +115,12 @@ function joinRoom() {
   });
 }
 
-/* SISTEMA DE CHAT EN TIEMPO REAL */
+/* CHAT EN TIEMPO REAL */
 function listenToChat() {
   if (!db || !localState.roomCode) return;
-  
+
   if (chatListenerRef) chatListenerRef.off();
-  
+
   const chatContainer = document.getElementById('chat-messages');
   if (chatContainer) chatContainer.innerHTML = '';
 
@@ -178,7 +178,7 @@ function toggleChat() {
   }
 }
 
-/* GENERACIÓN DE BARAJA COMPLETA */
+/* GENERACIÓN DE BARAJA */
 function generateDeck() {
   const colors = ['rojo', 'azul', 'verde', 'amarillo'];
   const deck = [];
@@ -272,20 +272,33 @@ function renderGameTable(data) {
   topEl.className = `unocard c-${data.topCard.color}`;
   topEl.innerHTML = createCardHTML(data.topCard);
 
+  /* RENDERIZADO DE OPONENTES ALREDEDOR DE LA MESA */
   const oppZone = document.getElementById('opponents-zone');
   oppZone.innerHTML = '';
-  playerOrder.forEach(id => {
-    if (id === localState.playerId) return;
+  
+  const otherPlayers = playerOrder.filter(id => id !== localState.playerId);
+  const totalOpponents = otherPlayers.length;
+
+  otherPlayers.forEach((id, index) => {
     const oppData = data.players[id];
     const handCount = oppData.hand ? oppData.hand.length : 0;
-    
+
+    let posClass = 'opp-pos-top';
+    if (totalOpponents === 2) {
+      posClass = index === 0 ? 'opp-pos-left' : 'opp-pos-right';
+    } else if (totalOpponents >= 3) {
+      if (index === 0) posClass = 'opp-pos-left';
+      else if (index === 1) posClass = 'opp-pos-top';
+      else if (index === 2) posClass = 'opp-pos-right';
+    }
+
     let backCardsHTML = '';
-    for (let i = 0; i < Math.min(handCount, 6); i++) {
+    for (let i = 0; i < Math.min(handCount, 5); i++) {
       backCardsHTML += '<div class="mini-card-back"></div>';
     }
 
     const cardBox = document.createElement('div');
-    cardBox.className = `opponent-card ${id === currentPlayerId ? 'active' : ''}`;
+    cardBox.className = `opponent-card ${posClass} ${id === currentPlayerId ? 'active' : ''}`;
     cardBox.innerHTML = `
       <span class="opp-name">${oppData.name} (${handCount})</span>
       <div class="opp-hand-visual">${backCardsHTML}</div>
@@ -293,6 +306,7 @@ function renderGameTable(data) {
     oppZone.appendChild(cardBox);
   });
 
+  /* RENDERIZADO DE MI MANO CON SCROLL Y SOLAPAMIENTO */
   const myHand = data.players[localState.playerId]?.hand || [];
   document.getElementById('my-card-count').textContent = myHand.length;
 
@@ -307,6 +321,7 @@ function renderGameTable(data) {
     carousel.appendChild(cardEl);
   });
 
+  /* COMPROBAR GANADOR */
   playerOrder.forEach(id => {
     if (data.players[id].hand && data.players[id].hand.length === 0) {
       alert(`¡${data.players[id].name} ha ganado la partida!`);
