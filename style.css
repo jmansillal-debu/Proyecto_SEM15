@@ -20,13 +20,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* FIX PC/MOBILE: Control de overflow y dimensiones absolutas para evitar scroll horizontal en body */
 html, body {
   width: 100vw;
   height: 100vh;
-  max-width: 100vw;
-  max-height: 100vh;
-  overflow: hidden;
-  position: fixed;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  position: relative;
   font-family: var(--font-main), sans-serif;
   background: var(--felt-green);
   color: #fff;
@@ -50,6 +51,7 @@ html, body {
 .screen {
   display: none;
   width: 100vw;
+  max-width: 100%;
   height: 100vh;
   position: absolute;
   inset: 0;
@@ -155,14 +157,21 @@ input[type="text"] {
 #screen-game.active {
   display: flex;
   width: 100vw;
+  max-width: 100%;
   height: 100vh;
   padding: 0;
+  overflow: hidden;
 }
 
+/* FIX PC: Centrado general con max-width de 1200px y prevención de overflow */
 .game-layout-wrapper {
   display: flex;
-  width: 100%;
+  width: 100vw;
+  max-width: 1200px;
+  margin: 0 auto;
   height: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 .game-main-area {
@@ -170,11 +179,13 @@ input[type="text"] {
   display: grid;
   grid-template-rows: auto 1fr auto;
   height: 100%;
-  padding: 10px;
+  padding: 10px 10px 100px 10px;
   position: relative;
+  width: 100%;
+  max-width: 100%;
 }
 
-/* PANELES DE RELLENO Y DECORACIÓN PARA PC */
+/* PANELES LATERALES EN PC */
 .side-panel {
   width: 220px;
   background: rgba(0, 0, 0, 0.4);
@@ -212,10 +223,6 @@ input[type="text"] {
   padding-left: 0;
 }
 
-@media (max-width: 1024px) {
-  .side-panel { display: none; }
-}
-
 .game-hud { display: flex; justify-content: center; gap: 12px; z-index: 20; }
 .hud-box { background: var(--wood-dark); border: 2px solid var(--wood-light); padding: 4px 12px; border-radius: 20px; text-align: center; min-width: 85px; }
 .hud-label { font-size: 0.55rem; color: #9ca3af; display: block; }
@@ -236,7 +243,6 @@ input[type="text"] {
   justify-content: center;
 }
 
-/* DISEÑO SIN CONTENEDOR DE JUGADORES/OPONENTES (MÁS GRANDES Y FLOTANTES) */
 .opponents-board {
   position: absolute;
   inset: 0;
@@ -278,7 +284,6 @@ input[type="text"] {
   justify-content: center;
 }
 
-/* CARTAS DE OPONENTES MÁS GRANDES */
 .mini-card-back {
   width: 28px;
   height: 42px;
@@ -337,60 +342,54 @@ input[type="text"] {
 .card-back { background: #111; border-color: var(--gold); display: flex; align-items: center; justify-content: center; }
 .card-back .card-inner { border: 1px solid var(--gold); color: var(--gold); font-size: 0.75rem; font-weight: 900; }
 
-/* DOCK DEL JUGADOR ELEVADO PARA MÓVILES */
+/* FIX MÓVIL/PC: DOCK DE CARTAS CON POSITION FIXED A 80PX DEL BORDE INFERIOR */
 .player-dock {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 95vw;
+  max-width: 650px;
   background: var(--wood-dark);
-  border-top: 3px solid var(--wood-light);
-  padding: 6px 10px 12px 10px;
-  border-radius: 12px 12px 0 0;
-  z-index: 20;
-  width: 100%;
-  max-width: 100vw;
-  margin-bottom: 0;
-}
-
-@media (max-width: 600px) {
-  .game-main-area {
-    grid-template-rows: auto 1fr auto;
-    padding-bottom: 0;
-  }
-  .player-dock {
-    padding-bottom: 25px;
-  }
-  .unocard {
-    width: 62px;
-    height: 92px;
-  }
+  border: 3px solid var(--wood-light);
+  padding: 8px 12px;
+  border-radius: 12px;
+  z-index: 50;
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.6);
 }
 
 .dock-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--gold); margin-bottom: 4px; }
 .btn-uno { background: var(--c-rojo); color: #fff; border: 1px solid #fff; padding: 4px 12px; border-radius: 4px; font-weight: 700; cursor: pointer; }
 
+/* FIX MÓVIL: CAROUSEL CON SWIPE HORIZONTAL SIN CORTES */
 .cards-carousel {
   display: flex;
   align-items: flex-end;
   overflow-x: auto;
-  padding: 10px 10px 4px 10px;
+  overflow-y: hidden;
+  white-space: nowrap;
+  padding: 10px 5px 6px 5px;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
 }
 
-.cards-carousel::-webkit-scrollbar { height: 6px; }
+.cards-carousel::-webkit-scrollbar { height: 5px; }
 .cards-carousel::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
 .cards-carousel::-webkit-scrollbar-thumb { background: var(--wood-light); border-radius: 4px; }
 .cards-carousel::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
 .cards-carousel .unocard {
-  margin-right: -22px;
+  margin-right: -18px;
   box-shadow: -2px 0 8px rgba(0,0,0,0.5);
+  flex-shrink: 0;
 }
 
-.cards-carousel .unocard:last-child { margin-right: 0; }
+.cards-carousel .unocard:last-child { margin-right: 8px; }
 
 .cards-carousel .unocard:hover,
 .cards-carousel .unocard:active {
-  transform: translateY(-14px) scale(1.05);
-  margin-right: -2px;
+  transform: translateY(-12px) scale(1.05);
   z-index: 30;
 }
 
@@ -400,11 +399,32 @@ input[type="text"] {
 .color-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
 .btn-color { padding: 12px; border: none; border-radius: 6px; font-weight: bold; color: #fff; cursor: pointer; }
 
-.chat-widget { position: fixed; bottom: 85px; right: 12px; z-index: 90; }
-.chat-toggle { background: var(--c-azul); border: 2px solid #fff; border-radius: 50%; width: 48px; height: 48px; font-size: 1.2rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); position: relative; }
+/* FIX MÓVIL/PC: BOTÓN DE CHAT REUBICADO A LA ESQUINA SUPERIOR DERECHA */
+.chat-widget { 
+  position: fixed; 
+  top: 12px; 
+  right: 12px; 
+  bottom: auto; 
+  z-index: 90; 
+}
+.chat-toggle { background: var(--c-azul); border: 2px solid #fff; border-radius: 50%; width: 44px; height: 44px; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); position: relative; }
 .chat-badge { position: absolute; top: -2px; right: -2px; background: var(--c-rojo); color: #fff; font-size: 0.6rem; border-radius: 50%; padding: 2px 5px; font-weight: 900; }
 
-.chat-box { position: absolute; bottom: 55px; right: 0; width: 280px; height: 320px; background: var(--wood-dark); border: 3px solid var(--wood-light); border-radius: 10px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.8); overflow: hidden; }
+.chat-box { 
+  position: absolute; 
+  top: 50px; 
+  right: 0; 
+  bottom: auto; 
+  width: 280px; 
+  height: 320px; 
+  background: var(--wood-dark); 
+  border: 3px solid var(--wood-light); 
+  border-radius: 10px; 
+  display: flex; 
+  flex-direction: column; 
+  box-shadow: 0 10px 25px rgba(0,0,0,0.8); 
+  overflow: hidden; 
+}
 .chat-box.hidden { display: none; }
 .chat-header { background: var(--wood-light); padding: 8px; display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--gold); }
 .chat-close { background: none; border: none; color: #fff; cursor: pointer; }
@@ -414,3 +434,41 @@ input[type="text"] {
 .chat-input-row { display: flex; border-top: 1px solid var(--wood-light); }
 .chat-input-row input { border: none; border-radius: 0; background: rgba(0,0,0,0.3); text-align: left; padding: 8px; font-size: 0.75rem; flex: 1; }
 .btn-send { background: var(--c-azul); border: none; color: #fff; padding: 0 12px; cursor: pointer; font-weight: bold; }
+
+/* MEDIA QUERIES RESPONSIVE */
+
+/* Ocultar laterales en tablet y móvil */
+@media (max-width: 1024px) {
+  .side-panel { display: none; }
+}
+
+/* Ajustes específicos para móviles (max-width 480px) */
+@media (max-width: 480px) {
+  .player-dock {
+    width: 96vw;
+    bottom: 80px;
+    padding: 6px 8px;
+  }
+  
+  .unocard {
+    width: 58px;
+    height: 86px;
+  }
+
+  .chat-widget {
+    top: 8px;
+    right: 8px;
+  }
+
+  .chat-box {
+    width: 250px;
+    height: 280px;
+  }
+}
+
+/* Ajuste escritorio centrado (hasta 1200px) */
+@media (min-width: 1200px) {
+  .game-layout-wrapper {
+    max-width: 1200px;
+  }
+}

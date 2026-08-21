@@ -1,430 +1,480 @@
+// Configuración de Firebase (Sustituye con tus credenciales si usas un proyecto propio)
 const firebaseConfig = {
-  apiKey: "AIzaSyD3ENYHqV1eFLPUMAc6HnusYG7-6S-iyqg",
-  authDomain: "proyectouno-84196.firebaseapp.com",
-  databaseURL: "https://proyectouno-84196-default-rtdb.firebaseio.com",
-  projectId: "proyectouno-84196",
-  storageBucket: "proyectouno-84196.appspot.com",
-  messagingSenderId: "926454626159",
-  appId: "1:926454626159:web:f1cfb4B36a810ac1a91a9a",
-  measurementId: "G-V966LGLNZB"
+  apiKey: "AIzaSyDummyKeyForUnoClassicOnlineAppJS",
+  authDomain: "uno-classic-app.firebaseapp.com",
+  databaseURL: "https://uno-classic-app-default-rtdb.firebaseio.com",
+  projectId: "uno-classic-app",
+  storageBucket: "uno-classic-app.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:000000000000"
 };
 
-let db = null;
-let chatListenerRef = null;
-let gameFinishedAlerted = false;
-
-function initializeDatabase() {
-  try {
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    db = firebase.database();
-    listenToGlobalWinners();
-  } catch (error) {
-    console.error("Error al inicializar Firebase:", error);
-  }
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
 }
-initializeDatabase();
+const db = firebase.database();
 
-let localState = {
-  roomCode: '',
-  playerId: '',
-  playerName: '',
-  isHost: false,
-  unreadCount: 0,
-  pendingPlay: null
-};
+// Estado global del cliente
+let myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
+let myPlayerName = '';
+let currentRoomCode = null;
+let roomRef = null;
+let chatRef = null;
+let currentGameState = null;
+let pendingWildCard = null;
 
+const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
+const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '🚫', '🔄'];
+
+// NAVEGACIÓN Y MENÚS
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const target = document.getElementById(screenId);
-  if (target) target.classList.add('active');
+  document.getElementById(screenId).classList.add('active');
 }
 
-function listenToGlobalWinners() {
-  if (!db) return;
-  db.ref('winners_history').limitToLast(8).on('value', snapshot => {
-    const ul = document.getElementById('winners-history-list');
-    if (!ul) return;
-    ul.innerHTML = '';
-    const data = snapshot.val();
-    if (!data) {
-      ul.innerHTML = '<li class="empty-msg">No hay victorias aún.</li>';
-      return;
-    }
-    Object.values(data).reverse().forEach(w => {
-      const li = document.createElement('li');
-      li.className = 'winner-item';
-      li.innerHTML = `<span>👑 ${w.name}</span> <small>${w.date}</small>`;
-      ul.appendChild(li);
-    });
-  });
-}
-
-function registerWinner(winnerName) {
-  if (!db) return;
-  db.ref('winners_history').push({
-    name: winnerName,
-    date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  });
+function getPlayerName() {
+  const input = document.getElementById('player-name-input').value.trim();
+  if (!input) {
+    alert('Por favor introduce tu apodo.');
+    return null;
+  }
+  myPlayerName = input;
+  return myPlayerName;
 }
 
 function createRoom() {
-  const name = document.getElementById('player-name-input').value.trim();
-  if (!name) return alert("Ingresa tu apodo.");
+  if (!getPlayerName()) return;
+  
+  const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  currentRoomCode = code;
+  roomRef = db.ref('rooms/' + code);
 
-  localState.playerName = name;
-  localState.playerId = 'p_' + Math.random().toString(36).substring(2, 7);
-  localState.roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-  localState.isHost = true;
-  gameFinishedAlerted = false;
-
-  db.ref('rooms/' + localState.roomCode).set({
-    status: 'LOBBY',
-    host: localState.playerId,
-    turnIndex: 0,
+  const initialRoomData = {
+    code: code,
+    host: myPlayerId,
+    status: 'waiting',
+    stack: 0,
     activeColor: 'rojo',
-    stackCount: 0,
+    currentTurnIndex: 0,
+    turnOrder: [],
+    topCard: null,
+    deck: generateDeck(),
     players: {
-      [localState.playerId]: { name, hand: [], id: localState.playerId }
+      [myPlayerId]: {
+        id: myPlayerId,
+        name: myPlayerName,
+        hand: [],
+        saidUno: false,
+        isHost: true
+      }
     }
-  }).then(() => {
-    listenToRoom();
-    listenToChat();
-    showScreen('screen-lobby');
+  };
+
+  roomRef.set(initialRoomData, (err) => {
+    if (!err) {
+      listenToRoom();
+      showScreen('screen-lobby');
+    }
   });
 }
 
 function joinRoom() {
-  const name = document.getElementById('player-name-input').value.trim();
+  if (!getPlayerName()) return;
   const code = document.getElementById('room-code-input').value.trim().toUpperCase();
-  if (!name || !code) return alert("Ingresa tu apodo y el código.");
+  if (!code) {
+    alert('Ingresa un código de sala válido.');
+    return;
+  }
 
-  localState.playerName = name;
-  localState.playerId = 'p_' + Math.random().toString(36).substring(2, 7);
-  localState.roomCode = code;
-  gameFinishedAlerted = false;
+  currentRoomCode = code;
+  roomRef = db.ref('rooms/' + code);
 
-  db.ref(`rooms/${code}`).once('value', snapshot => {
-    if (!snapshot.exists()) return alert("Mesa no encontrada.");
+  roomRef.once('value', snapshot => {
+    if (!snapshot.exists()) {
+      alert('La sala no existe.');
+      return;
+    }
+    const data = snapshot.val();
+    if (data.status !== 'waiting') {
+      alert('La partida ya ha comenzado o ha finalizado.');
+      return;
+    }
 
-    db.ref(`rooms/${code}/players/${localState.playerId}`).set({
-      name, hand: [], id: localState.playerId
-    }).then(() => {
-      listenToRoom();
-      listenToChat();
-      showScreen('screen-lobby');
+    roomRef.child('players/' + myPlayerId).set({
+      id: myPlayerId,
+      name: myPlayerName,
+      hand: [],
+      saidUno: false,
+      isHost: false
     });
+
+    listenToRoom();
+    showScreen('screen-lobby');
   });
 }
 
-function listenToChat() {
-  if (!db || !localState.roomCode) return;
-  if (chatListenerRef) chatListenerRef.off();
-
-  const chatContainer = document.getElementById('chat-messages');
-  if (chatContainer) chatContainer.innerHTML = '';
-
-  chatListenerRef = db.ref(`chats/${localState.roomCode}`);
-  chatListenerRef.on('child_added', snapshot => {
-    const msg = snapshot.val();
-    if (msg) appendChatMessage(msg);
+// LÓGICA DE BARAJA Y JUEGO
+function generateDeck() {
+  let deck = [];
+  COLORS.forEach(color => {
+    VALUES.forEach(val => {
+      deck.push({ color, value: val, id: Math.random().toString(36).substr(2, 9) });
+      if (val !== '0') deck.push({ color, value: val, id: Math.random().toString(36).substr(2, 9) });
+    });
   });
+
+  // Cartas Especiales (Negras)
+  for (let i = 0; i < 4; i++) {
+    deck.push({ color: 'negro', value: '★', id: Math.random().toString(36).substr(2, 9) });
+    deck.push({ color: 'negro', value: '+4', id: Math.random().toString(36).substr(2, 9) });
+  }
+
+  // Mezclar
+  return deck.sort(() => Math.random() - 0.5);
+}
+
+function listenToRoom() {
+  document.getElementById('lobby-code-display').innerText = currentRoomCode;
+  
+  roomRef.on('value', snapshot => {
+    if (!snapshot.exists()) return;
+    currentGameState = snapshot.val();
+    updateUI();
+  });
+
+  // Escuchar chat
+  chatRef = db.ref('chats/' + currentRoomCode);
+  chatRef.on('value', snapshot => {
+    if (!snapshot.exists()) return;
+    renderChat(snapshot.val());
+  });
+
+  // Cargar Historial de Ganadores
+  db.ref('winners').limitToLast(5).on('value', snapshot => {
+    if (!snapshot.exists()) return;
+    renderWinners(snapshot.val());
+  });
+}
+
+function startGame() {
+  if (!currentGameState || currentGameState.host !== myPlayerId) return;
+
+  const playerKeys = Object.keys(currentGameState.players);
+  if (playerKeys.length < 1) {
+    alert('Se necesitan más jugadores para iniciar.');
+    return;
+  }
+
+  let deck = [...currentGameState.deck];
+  let players = { ...currentGameState.players };
+
+  // Repartir 7 cartas a cada uno
+  playerKeys.forEach(pId => {
+    players[pId].hand = deck.splice(0, 7);
+  });
+
+  // Obtener primera carta válida (no especial negra)
+  let topCard = deck.pop();
+  while (topCard.color === 'negro') {
+    deck.unshift(topCard);
+    topCard = deck.pop();
+  }
+
+  roomRef.update({
+    status: 'playing',
+    deck: deck,
+    players: players,
+    topCard: topCard,
+    activeColor: topCard.color,
+    turnOrder: playerKeys,
+    currentTurnIndex: 0
+  });
+}
+
+// ACTUALIZACIÓN DE INTERFAZ (UI)
+function updateUI() {
+  if (currentGameState.status === 'waiting') {
+    showScreen('screen-lobby');
+    const playersArr = Object.values(currentGameState.players || {});
+    document.getElementById('player-count').innerText = playersArr.length;
+    
+    const list = document.getElementById('lobby-players-list');
+    list.innerHTML = playersArr.map(p => `<li>${p.name} ${p.isHost ? '👑' : ''}</li>`).join('');
+
+    if (currentGameState.host === myPlayerId) {
+      document.getElementById('btn-start-game').style.display = 'block';
+      document.getElementById('waiting-msg').style.display = 'none';
+    } else {
+      document.getElementById('btn-start-game').style.display = 'none';
+      document.getElementById('waiting-msg').style.display = 'block';
+    }
+  } else if (currentGameState.status === 'playing') {
+    showScreen('screen-game');
+    renderGameBoard();
+  }
+}
+
+function renderGameBoard() {
+  const turnPlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
+  const isMyTurn = turnPlayerId === myPlayerId;
+  const turnPlayerName = currentGameState.players[turnPlayerId]?.name || '---';
+
+  document.getElementById('turn-display').innerText = isMyTurn ? '¡TU TURNO!' : turnPlayerName;
+  document.getElementById('turn-display').style.color = isMyTurn ? '#ffb300' : '#fff';
+  
+  const colorInd = document.getElementById('active-color-indicator');
+  colorInd.className = 'color-dot c-' + currentGameState.activeColor;
+
+  document.getElementById('stack-display').innerText = '+' + (currentGameState.stack || 0);
+
+  // Carta centro (Descarte)
+  const topCardSpot = document.getElementById('top-card');
+  if (currentGameState.topCard) {
+    topCardSpot.className = `unocard c-${currentGameState.topCard.color}`;
+    topCardSpot.innerHTML = `
+      <span class="card-corner">${currentGameState.topCard.value}</span>
+      <div class="card-inner">${currentGameState.topCard.value}</div>
+      <span class="card-corner bottom">${currentGameState.topCard.value}</span>
+    `;
+  }
+
+  // Oponentes
+  renderOpponents(turnPlayerId);
+
+  // Mi mano
+  renderMyHand(isMyTurn);
+}
+
+function renderOpponents(activeTurnId) {
+  const board = document.getElementById('opponents-zone');
+  board.innerHTML = '';
+
+  const opponents = Object.values(currentGameState.players).filter(p => p.id !== myPlayerId);
+  const positions = ['opp-pos-top', 'opp-pos-left', 'opp-pos-right'];
+
+  opponents.forEach((opp, idx) => {
+    const posClass = positions[idx % positions.length];
+    const isActiveClass = opp.id === activeTurnId ? 'active' : '';
+    
+    let cardsBackHTML = '';
+    const cardCount = (opp.hand || []).length;
+    for (let i = 0; i < Math.min(cardCount, 5); i++) {
+      cardsBackHTML += `<div class="mini-card-back"></div>`;
+    }
+
+    const div = document.createElement('div');
+    div.className = `opponent-card ${posClass} ${isActiveClass}`;
+    div.innerHTML = `
+      <span class="opp-name">${opp.name} (${cardCount})</span>
+      <div class="opp-hand-visual">${cardsBackHTML}</div>
+    `;
+    board.appendChild(div);
+  });
+}
+
+function renderMyHand(isMyTurn) {
+  const container = document.getElementById('my-hand');
+  container.innerHTML = '';
+
+  const myData = currentGameState.players[myPlayerId];
+  if (!myData || !myData.hand) return;
+
+  document.getElementById('my-card-count').innerText = myData.hand.length;
+
+  myData.hand.forEach((card) => {
+    const cardEl = document.createElement('div');
+    cardEl.className = `unocard c-${card.color}`;
+    cardEl.innerHTML = `
+      <span class="card-corner">${card.value}</span>
+      <div class="card-inner">${card.value}</div>
+      <span class="card-corner bottom">${card.value}</span>
+    `;
+
+    cardEl.onclick = () => {
+      if (isMyTurn) playCard(card);
+    };
+
+    container.appendChild(cardEl);
+  });
+}
+
+// JUGAR CARTA Y REGLAS DE TURNO
+function playCard(card) {
+  const top = currentGameState.topCard;
+  const activeColor = currentGameState.activeColor;
+  const stack = currentGameState.stack || 0;
+
+  let isValid = false;
+
+  // Lógica con acumulaciones activas
+  if (stack > 0) {
+    if (card.value === '+2' || card.value === '+4') {
+      isValid = true;
+    }
+  } else {
+    // Lógica standard de jugada
+    if (card.color === 'negro' || card.color === activeColor || card.value === top.value) {
+      isValid = true;
+    }
+  }
+
+  if (!isValid) return;
+
+  if (card.color === 'negro') {
+    pendingWildCard = card;
+    document.getElementById('color-modal').classList.remove('hidden');
+  } else {
+    executeMove(card, card.color);
+  }
+}
+
+function selectColor(color) {
+  document.getElementById('color-modal').classList.add('hidden');
+  if (pendingWildCard) {
+    executeMove(pendingWildCard, color);
+    pendingWildCard = null;
+  }
+}
+
+function executeMove(card, chosenColor) {
+  let myHand = [...currentGameState.players[myPlayerId].hand];
+  myHand = myHand.filter(c => c.id !== card.id);
+
+  let newStack = currentGameState.stack || 0;
+  if (card.value === '+2') newStack += 2;
+  if (card.value === '+4') newStack += 4;
+
+  // Comprobar Victoria
+  if (myHand.length === 0) {
+    db.ref('winners').push({
+      name: myPlayerName,
+      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+
+    alert('¡HAZ GANADO LA PARTIDA!');
+    roomRef.update({ status: 'waiting' });
+    return;
+  }
+
+  // Siguiente Turno
+  let nextIndex = currentGameState.currentTurnIndex;
+  let step = card.value === '🔄' ? -1 : 1;
+  
+  if (card.value === '🚫') {
+    nextIndex = getNextTurnIndex(nextIndex, step * 2);
+  } else {
+    nextIndex = getNextTurnIndex(nextIndex, step);
+  }
+
+  const updates = {};
+  updates[`players/${myPlayerId}/hand`] = myHand;
+  updates['topCard'] = card;
+  updates['activeColor'] = chosenColor;
+  updates['stack'] = newStack;
+  updates['currentTurnIndex'] = nextIndex;
+
+  roomRef.update(updates);
+}
+
+function getNextTurnIndex(currentIndex, step) {
+  const total = currentGameState.turnOrder.length;
+  let next = (currentIndex + step) % total;
+  if (next < 0) next += total;
+  return next;
+}
+
+function drawCardCurrentPlayer() {
+  const turnPlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
+  if (turnPlayerId !== myPlayerId) return;
+
+  let deck = [...(currentGameState.deck || [])];
+  let myHand = [...(currentGameState.players[myPlayerId].hand || [])];
+  let stack = currentGameState.stack || 0;
+
+  // Si no hay cartas suficientes en el mazo
+  if (deck.length < Math.max(1, stack)) {
+    deck = generateDeck();
+  }
+
+  const drawCount = stack > 0 ? stack : 1;
+  for (let i = 0; i < drawCount; i++) {
+    if (deck.length > 0) {
+      myHand.push(deck.pop());
+    }
+  }
+
+  const nextIndex = getNextTurnIndex(currentGameState.currentTurnIndex, 1);
+
+  roomRef.update({
+    deck: deck,
+    stack: 0,
+    [`players/${myPlayerId}/hand`]: myHand,
+    currentTurnIndex: nextIndex
+  });
+}
+
+function sayUno() {
+  const myHand = currentGameState.players[myPlayerId]?.hand || [];
+  if (myHand.length === 1) {
+    chatRef.push({
+      sender: 'SISTEMA',
+      text: `¡${myPlayerName} ha cantado ¡UNO!!`
+    });
+  } else {
+    alert('Solo puedes cantar UNO si te queda exactamente 1 carta.');
+  }
+}
+
+// SISTEMA DE CHAT
+function toggleChat() {
+  const chatBox = document.getElementById('chat-box');
+  chatBox.classList.toggle('hidden');
+  document.getElementById('chat-badge').innerText = '0';
 }
 
 function sendChatMessage() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text || !localState.roomCode) return;
+  if (!text || !chatRef) return;
 
-  db.ref(`chats/${localState.roomCode}`).push({
-    sender: localState.playerName || 'Jugador',
-    text: text,
-    timestamp: Date.now()
+  chatRef.push({
+    sender: myPlayerName,
+    text: text
   });
+
   input.value = '';
 }
 
-function handleChatKey(e) {
-  if (e.key === 'Enter') sendChatMessage();
+function handleChatKey(event) {
+  if (event.key === 'Enter') {
+    sendChatMessage();
+  }
 }
 
-function appendChatMessage(msg) {
+function renderChat(messagesObj) {
   const container = document.getElementById('chat-messages');
-  if (!container) return;
-
-  const el = document.createElement('div');
-  el.className = 'chat-msg';
-  el.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text}`;
-  container.appendChild(el);
-  container.scrollTop = container.scrollHeight;
-
-  const box = document.getElementById('chat-box');
-  if (box && box.classList.contains('hidden')) {
-    localState.unreadCount++;
-    const badge = document.getElementById('chat-badge');
-    if (badge) badge.textContent = localState.unreadCount;
-  }
-}
-
-function toggleChat() {
-  const box = document.getElementById('chat-box');
-  if (!box) return;
-  box.classList.toggle('hidden');
-  if (!box.classList.contains('hidden')) {
-    localState.unreadCount = 0;
-    const badge = document.getElementById('chat-badge');
-    if (badge) badge.textContent = '0';
-  }
-}
-
-function generateDeck() {
-  const colors = ['rojo', 'azul', 'verde', 'amarillo'];
-  const deck = [];
-
-  colors.forEach(color => {
-    for (let i = 0; i <= 9; i++) {
-      deck.push({ color, value: i, label: i.toString() });
-      if (i !== 0) deck.push({ color, value: i, label: i.toString() });
-    }
-    deck.push({ color, value: 2, label: '+2' });
-    deck.push({ color, value: 2, label: '+2' });
-    deck.push({ color, value: 5, label: '+5' });
-  });
-
-  for (let i = 0; i < 4; i++) {
-    deck.push({ color: 'negro', value: 4, label: '+4' });
-    deck.push({ color: 'negro', value: 0, label: '★' });
-  }
-
-  return deck.sort(() => Math.random() - 0.5);
-}
-
-function startGame() {
-  let deck = generateDeck();
-  const roomRef = db.ref('rooms/' + localState.roomCode);
-
-  roomRef.once('value', snapshot => {
-    const data = snapshot.val();
-    const playerIds = Object.keys(data.players);
-
-    playerIds.forEach(id => {
-      data.players[id].hand = deck.splice(0, 7);
-    });
-
-    let topCard = deck.pop();
-    while (topCard.color === 'negro') {
-      deck.unshift(topCard);
-      topCard = deck.pop();
-    }
-
-    roomRef.update({
-      status: 'PLAYING',
-      deck: deck,
-      topCard: topCard,
-      activeColor: topCard.color,
-      playerOrder: playerIds,
-      turnIndex: 0,
-      stackCount: topCard.label.startsWith('+') ? topCard.value : 0,
-      players: data.players
-    });
-  });
-}
-
-function listenToRoom() {
-  const roomRef = db.ref('rooms/' + localState.roomCode);
-  roomRef.on('value', snapshot => {
-    const data = snapshot.val();
-    if (!data) return;
-
-    if (data.status === 'LOBBY') {
-      document.getElementById('lobby-code-display').textContent = localState.roomCode;
-      const players = Object.values(data.players || {});
-      document.getElementById('player-count').textContent = players.length;
-      document.getElementById('lobby-players-list').innerHTML = players.map(p => `<li>${p.name}</li>`).join('');
-      document.getElementById('btn-start-game').style.display = localState.isHost ? 'block' : 'none';
-      document.getElementById('waiting-msg').style.display = localState.isHost ? 'none' : 'block';
-    } else if (data.status === 'PLAYING' || data.status === 'FINISHED') {
-      showScreen('screen-game');
-      renderGameTable(data);
-    }
-  });
-}
-
-function createCardHTML(card) {
-  return `
-    <span class="card-corner top">${card.label}</span>
-    <div class="card-inner">${card.label}</div>
-    <span class="card-corner bottom">${card.label}</span>
-  `;
-}
-
-function renderGameTable(data) {
-  const playerOrder = data.playerOrder || [];
-  const currentPlayerId = playerOrder[data.turnIndex];
-
-  document.getElementById('turn-display').textContent = data.players[currentPlayerId]?.name || '---';
-  document.getElementById('active-color-indicator').className = `color-dot c-${data.activeColor}`;
-  document.getElementById('stack-display').textContent = `+${data.stackCount || 0}`;
-
-  const topEl = document.getElementById('top-card');
-  topEl.className = `unocard c-${data.topCard.color}`;
-  topEl.innerHTML = createCardHTML(data.topCard);
-
-  /* DIBUJO DE OPONENTES SIN CONTENEDOR DE CAJA */
-  const oppZone = document.getElementById('opponents-zone');
-  oppZone.innerHTML = '';
+  container.innerHTML = '';
   
-  const otherPlayers = playerOrder.filter(id => id !== localState.playerId);
-  const totalOpponents = otherPlayers.length;
-
-  otherPlayers.forEach((id, index) => {
-    const oppData = data.players[id];
-    const handCount = oppData.hand ? oppData.hand.length : 0;
-
-    let posClass = 'opp-pos-top';
-    if (totalOpponents === 2) {
-      posClass = index === 0 ? 'opp-pos-left' : 'opp-pos-right';
-    } else if (totalOpponents >= 3) {
-      if (index === 0) posClass = 'opp-pos-left';
-      else if (index === 1) posClass = 'opp-pos-top';
-      else if (index === 2) posClass = 'opp-pos-right';
-    }
-
-    let backCardsHTML = '';
-    const visibleCards = Math.min(handCount, 6);
-    for (let i = 0; i < visibleCards; i++) {
-      backCardsHTML += '<div class="mini-card-back"></div>';
-    }
-
-    const cardBox = document.createElement('div');
-    cardBox.className = `opponent-card ${posClass} ${id === currentPlayerId ? 'active' : ''}`;
-    cardBox.innerHTML = `
-      <span class="opp-name">${oppData.name} (${handCount})</span>
-      <div class="opp-hand-visual">${backCardsHTML}</div>
-    `;
-    oppZone.appendChild(cardBox);
+  const msgs = Object.values(messagesObj);
+  msgs.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    div.innerHTML = `<strong>${m.sender}</strong><span>${m.text}</span>`;
+    container.appendChild(div);
   });
 
-  /* RENDERIZADO DE MI MANO */
-  const myHand = data.players[localState.playerId]?.hand || [];
-  document.getElementById('my-card-count').textContent = myHand.length;
-
-  const carousel = document.getElementById('my-hand');
-  carousel.innerHTML = '';
-
-  myHand.forEach((card, index) => {
-    const cardEl = document.createElement('div');
-    cardEl.className = `unocard c-${card.color}`;
-    cardEl.innerHTML = createCardHTML(card);
-    cardEl.onclick = () => {
-      if (data.status === 'PLAYING') playCard(index, card, data);
-    };
-    carousel.appendChild(cardEl);
-  });
-
-  /* COMPROBACIÓN Y FINALIZACIÓN DE JUEGO (0 CARTAS) */
-  playerOrder.forEach(id => {
-    const pHand = data.players[id].hand || [];
-    if (pHand.length === 0 && data.status === 'PLAYING') {
-      const winnerName = data.players[id].name;
-
-      if (localState.isHost) {
-        registerWinner(winnerName);
-        db.ref('rooms/' + localState.roomCode).update({
-          status: 'FINISHED',
-          winner: winnerName
-        });
-      }
-    }
-  });
-
-  if (data.status === 'FINISHED' && !gameFinishedAlerted) {
-    gameFinishedAlerted = true;
-    setTimeout(() => {
-      alert(`🎉 ¡EL JUEGO HA TERMINADO! EL GANADOR ES: ${data.winner}`);
-    }, 100);
-  }
+  container.scrollTop = container.scrollHeight;
 }
 
-function playCard(handIndex, card, roomData) {
-  if (roomData.status !== 'PLAYING') return alert("El juego ha terminado.");
-  if (roomData.playerOrder[roomData.turnIndex] !== localState.playerId) {
-    return alert("No es tu turno.");
-  }
+function renderWinners(winnersObj) {
+  const list = document.getElementById('winners-history-list');
+  list.innerHTML = '';
+  const winners = Object.values(winnersObj).reverse();
 
-  const isStackActive = roomData.stackCount > 0;
-  let isValid = false;
-
-  if (isStackActive) {
-    isValid = card.label.startsWith('+');
-  } else {
-    isValid = card.color === 'negro' || card.color === roomData.activeColor || card.label === roomData.topCard.label;
-  }
-
-  if (!isValid) {
-    return alert(isStackActive ? "Debes responder con una carta de suma (+2, +4, +5) o comer." : "Carta inválida.");
-  }
-
-  if (card.color === 'negro') {
-    localState.pendingPlay = { handIndex, card, roomData };
-    document.getElementById('color-modal').classList.remove('hidden');
-    return;
-  }
-
-  executePlay(handIndex, card, card.color, roomData);
-}
-
-function selectColor(selectedColor) {
-  document.getElementById('color-modal').classList.add('hidden');
-  if (localState.pendingPlay) {
-    const { handIndex, card, roomData } = localState.pendingPlay;
-    localState.pendingPlay = null;
-    executePlay(handIndex, card, selectedColor, roomData);
-  }
-}
-
-function executePlay(handIndex, card, chosenColor, roomData) {
-  const roomRef = db.ref('rooms/' + localState.roomCode);
-  const myHand = roomData.players[localState.playerId].hand;
-  const played = myHand.splice(handIndex, 1)[0];
-  const nextTurn = (roomData.turnIndex + 1) % roomData.playerOrder.length;
-
-  const addedStack = card.label.startsWith('+') ? card.value : 0;
-
-  roomRef.update({
-    topCard: played,
-    activeColor: chosenColor,
-    stackCount: roomData.stackCount + addedStack,
-    turnIndex: nextTurn,
-    [`players/${localState.playerId}/hand`]: myHand
+  winners.forEach(w => {
+    const li = document.createElement('li');
+    li.className = 'winner-item';
+    li.innerHTML = `<span>${w.name}</span> <span>${w.date || ''}</span>`;
+    list.appendChild(li);
   });
 }
-
-function drawCardCurrentPlayer() {
-  const roomRef = db.ref('rooms/' + localState.roomCode);
-
-  roomRef.once('value', snapshot => {
-    const data = snapshot.val();
-    if (data.status !== 'PLAYING') return alert("El juego ha terminado.");
-    if (data.playerOrder[data.turnIndex] !== localState.playerId) return alert("No es tu turno.");
-
-    let myHand = data.players[localState.playerId].hand || [];
-    let deck = data.deck || generateDeck();
-
-    const drawCount = data.stackCount > 0 ? data.stackCount : 1;
-    for (let i = 0; i < drawCount; i++) {
-      if (deck.length === 0) deck = generateDeck();
-      myHand.push(deck.pop());
-    }
-
-    const nextTurn = (data.turnIndex + 1) % data.playerOrder.length;
-
-    roomRef.update({
-      deck: deck,
-      stackCount: 0,
-      turnIndex: nextTurn,
-      [`players/${localState.playerId}/hand`]: myHand
-    });
-  });
-}
-
-function sayUno() { alert("¡GRITASTE UNO!"); }
