@@ -1,12 +1,12 @@
-// SUSTITUYE ESTOS VALORES CON LOS DE TU CONSOLA DE FIREBASE:
+// SUSTITUYE ESTE BLOQUE CON LAS CREDENCIALES REALES DE TU PROYECTO DE FIREBASE:
 const firebaseConfig = {
-  apiKey: "TU_API_KEY_REAL",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com",
-  projectId: "tu-proyecto",
-  storageBucket: "tu-proyecto.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  apiKey: "AIzaSyDummyKeyForUnoClassicOnlineAppJS",
+  authDomain: "uno-classic-app.firebaseapp.com",
+  databaseURL: "https://uno-classic-app-default-rtdb.firebaseio.com",
+  projectId: "uno-classic-app",
+  storageBucket: "uno-classic-app.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:000000000000"
 };
 
 if (!firebase.apps.length) {
@@ -29,7 +29,8 @@ const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '🚫', 
 // NAVEGACIÓN Y MENÚS
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(screenId).classList.add('active');
+  const target = document.getElementById(screenId);
+  if (target) target.classList.add('active');
 }
 
 function getPlayerName() {
@@ -75,9 +76,9 @@ function createRoom() {
       listenToRoom();
       showScreen('screen-lobby');
     })
-    .catch((err) => {
-      console.error("Error al crear sala:", err);
-      alert("Error de conexión con la base de datos: " + err.message);
+    .catch(err => {
+      console.error("Error al crear la sala:", err);
+      alert("Error al conectar con la base de datos: " + err.message);
     });
 }
 
@@ -109,10 +110,14 @@ function joinRoom() {
       hand: [],
       saidUno: false,
       isHost: false
+    }).then(() => {
+      listenToRoom();
+      showScreen('screen-lobby');
+    }).catch(err => {
+      alert("Error al unirse a la sala: " + err.message);
     });
-
-    listenToRoom();
-    showScreen('screen-lobby');
+  }, err => {
+    alert("Error de lectura en base de datos: " + err.message);
   });
 }
 
@@ -126,16 +131,19 @@ function generateDeck() {
     });
   });
 
+  // Cartas Especiales (Negras)
   for (let i = 0; i < 4; i++) {
     deck.push({ color: 'negro', value: '★', id: Math.random().toString(36).substr(2, 9) });
     deck.push({ color: 'negro', value: '+4', id: Math.random().toString(36).substr(2, 9) });
   }
 
+  // Mezclar
   return deck.sort(() => Math.random() - 0.5);
 }
 
 function listenToRoom() {
-  document.getElementById('lobby-code-display').innerText = currentRoomCode;
+  const display = document.getElementById('lobby-code-display');
+  if (display) display.innerText = currentRoomCode;
   
   roomRef.on('value', snapshot => {
     if (!snapshot.exists()) return;
@@ -143,6 +151,7 @@ function listenToRoom() {
     updateUI();
   });
 
+  // Escuchar chat
   chatRef = db.ref('chats/' + currentRoomCode);
   chatRef.on('value', snapshot => {
     if (!snapshot.exists()) return;
@@ -150,22 +159,24 @@ function listenToRoom() {
   });
 }
 
-// Cargar Historial Global de Ganadores al iniciar
+// Cargar Historial de Ganadores al iniciar
 db.ref('winners').limitToLast(5).on('value', snapshot => {
   const list = document.getElementById('winners-history-list');
   if (!snapshot.exists()) {
-    list.innerHTML = '<li class="empty-msg">No hay victorias registradas aún.</li>';
+    if (list) list.innerHTML = '<li style="padding:10px; opacity:0.6;">Sin victorias aún</li>';
     return;
   }
   renderWinners(snapshot.val());
-}, (err) => {
-  console.error("Error al cargar ganadores:", err);
+}, err => {
+  console.error("Error al cargar historial de ganadores:", err);
+  const list = document.getElementById('winners-history-list');
+  if (list) list.innerHTML = '<li style="color:#ff6b6b; padding:10px;">Error de conexión con Firebase</li>';
 });
 
 function startGame() {
   if (!currentGameState || currentGameState.host !== myPlayerId) return;
 
-  const playerKeys = Object.keys(currentGameState.players);
+  const playerKeys = Object.keys(currentGameState.players || {});
   if (playerKeys.length < 1) {
     alert('Se necesitan más jugadores para iniciar.');
     return;
@@ -174,12 +185,14 @@ function startGame() {
   let deck = [...currentGameState.deck];
   let players = { ...currentGameState.players };
 
+  // Repartir 7 cartas a cada uno
   playerKeys.forEach(pId => {
     players[pId].hand = deck.splice(0, 7);
   });
 
+  // Obtener primera carta válida (no especial negra)
   let topCard = deck.pop();
-  while (topCard.color === 'negro') {
+  while (topCard && topCard.color === 'negro') {
     deck.unshift(topCard);
     topCard = deck.pop();
   }
@@ -189,27 +202,36 @@ function startGame() {
     deck: deck,
     players: players,
     topCard: topCard,
-    activeColor: topCard.color,
+    activeColor: topCard ? topCard.color : 'rojo',
     turnOrder: playerKeys,
     currentTurnIndex: 0
   });
 }
 
+// ACTUALIZACIÓN DE INTERFAZ (UI)
 function updateUI() {
+  if (!currentGameState) return;
+
   if (currentGameState.status === 'waiting') {
     showScreen('screen-lobby');
     const playersArr = Object.values(currentGameState.players || {});
-    document.getElementById('player-count').innerText = playersArr.length;
+    const pCount = document.getElementById('player-count');
+    if (pCount) pCount.innerText = playersArr.length;
     
     const list = document.getElementById('lobby-players-list');
-    list.innerHTML = playersArr.map(p => `<li>${p.name} ${p.isHost ? '👑' : ''}</li>`).join('');
+    if (list) {
+      list.innerHTML = playersArr.map(p => `<li>${p.name} ${p.isHost ? '👑' : ''}</li>`).join('');
+    }
 
+    const btnStart = document.getElementById('btn-start-game');
+    const msgWait = document.getElementById('waiting-msg');
+    
     if (currentGameState.host === myPlayerId) {
-      document.getElementById('btn-start-game').style.display = 'block';
-      document.getElementById('waiting-msg').style.display = 'none';
+      if (btnStart) btnStart.style.display = 'block';
+      if (msgWait) msgWait.style.display = 'none';
     } else {
-      document.getElementById('btn-start-game').style.display = 'none';
-      document.getElementById('waiting-msg').style.display = 'block';
+      if (btnStart) btnStart.style.display = 'none';
+      if (msgWait) msgWait.style.display = 'block';
     }
   } else if (currentGameState.status === 'playing') {
     showScreen('screen-game');
@@ -222,16 +244,21 @@ function renderGameBoard() {
   const isMyTurn = turnPlayerId === myPlayerId;
   const turnPlayerName = currentGameState.players[turnPlayerId]?.name || '---';
 
-  document.getElementById('turn-display').innerText = isMyTurn ? '¡TU TURNO!' : turnPlayerName;
-  document.getElementById('turn-display').style.color = isMyTurn ? '#ffb300' : '#fff';
+  const turnDisp = document.getElementById('turn-display');
+  if (turnDisp) {
+    turnDisp.innerText = isMyTurn ? '¡TU TURNO!' : turnPlayerName;
+    turnDisp.style.color = isMyTurn ? '#ffb300' : '#fff';
+  }
   
   const colorInd = document.getElementById('active-color-indicator');
-  colorInd.className = 'color-dot c-' + currentGameState.activeColor;
+  if (colorInd) colorInd.className = 'color-dot c-' + currentGameState.activeColor;
 
-  document.getElementById('stack-display').innerText = '+' + (currentGameState.stack || 0);
+  const stackDisp = document.getElementById('stack-display');
+  if (stackDisp) stackDisp.innerText = '+' + (currentGameState.stack || 0);
 
+  // Carta centro (Descarte)
   const topCardSpot = document.getElementById('top-card');
-  if (currentGameState.topCard) {
+  if (topCardSpot && currentGameState.topCard) {
     topCardSpot.className = `unocard c-${currentGameState.topCard.color}`;
     topCardSpot.innerHTML = `
       <span class="card-corner">${currentGameState.topCard.value}</span>
@@ -240,15 +267,19 @@ function renderGameBoard() {
     `;
   }
 
+  // Oponentes
   renderOpponents(turnPlayerId);
+
+  // Mi mano
   renderMyHand(isMyTurn);
 }
 
 function renderOpponents(activeTurnId) {
   const board = document.getElementById('opponents-zone');
+  if (!board) return;
   board.innerHTML = '';
 
-  const opponents = Object.values(currentGameState.players).filter(p => p.id !== myPlayerId);
+  const opponents = Object.values(currentGameState.players || {}).filter(p => p.id !== myPlayerId);
   const positions = ['opp-pos-top', 'opp-pos-left', 'opp-pos-right'];
 
   opponents.forEach((opp, idx) => {
@@ -273,12 +304,14 @@ function renderOpponents(activeTurnId) {
 
 function renderMyHand(isMyTurn) {
   const container = document.getElementById('my-hand');
+  if (!container) return;
   container.innerHTML = '';
 
   const myData = currentGameState.players[myPlayerId];
   if (!myData || !myData.hand) return;
 
-  document.getElementById('my-card-count').innerText = myData.hand.length;
+  const cardCountElem = document.getElementById('my-card-count');
+  if (cardCountElem) cardCountElem.innerText = myData.hand.length;
 
   myData.hand.forEach((card) => {
     const cardEl = document.createElement('div');
@@ -297,6 +330,7 @@ function renderMyHand(isMyTurn) {
   });
 }
 
+// JUGAR CARTA Y REGLAS DE TURNO
 function playCard(card) {
   const top = currentGameState.topCard;
   const activeColor = currentGameState.activeColor;
@@ -304,11 +338,13 @@ function playCard(card) {
 
   let isValid = false;
 
+  // Lógica con acumulaciones activas
   if (stack > 0) {
     if (card.value === '+2' || card.value === '+4') {
       isValid = true;
     }
   } else {
+    // Lógica standard de jugada
     if (card.color === 'negro' || card.color === activeColor || card.value === top.value) {
       isValid = true;
     }
@@ -318,14 +354,16 @@ function playCard(card) {
 
   if (card.color === 'negro') {
     pendingWildCard = card;
-    document.getElementById('color-modal').classList.remove('hidden');
+    const modal = document.getElementById('color-modal');
+    if (modal) modal.classList.remove('hidden');
   } else {
     executeMove(card, card.color);
   }
 }
 
 function selectColor(color) {
-  document.getElementById('color-modal').classList.add('hidden');
+  const modal = document.getElementById('color-modal');
+  if (modal) modal.classList.add('hidden');
   if (pendingWildCard) {
     executeMove(pendingWildCard, color);
     pendingWildCard = null;
@@ -340,17 +378,19 @@ function executeMove(card, chosenColor) {
   if (card.value === '+2') newStack += 2;
   if (card.value === '+4') newStack += 4;
 
+  // Comprobar Victoria
   if (myHand.length === 0) {
     db.ref('winners').push({
       name: myPlayerName,
       date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
 
-    alert('¡HAZ GANADO LA PARTIDA!');
+    alert('¡HAS GANADO LA PARTIDA!');
     roomRef.update({ status: 'waiting' });
     return;
   }
 
+  // Siguiente Turno
   let nextIndex = currentGameState.currentTurnIndex;
   let step = card.value === '🔄' ? -1 : 1;
   
@@ -385,6 +425,7 @@ function drawCardCurrentPlayer() {
   let myHand = [...(currentGameState.players[myPlayerId].hand || [])];
   let stack = currentGameState.stack || 0;
 
+  // Si no hay cartas suficientes en el mazo
   if (deck.length < Math.max(1, stack)) {
     deck = generateDeck();
   }
@@ -409,23 +450,28 @@ function drawCardCurrentPlayer() {
 function sayUno() {
   const myHand = currentGameState.players[myPlayerId]?.hand || [];
   if (myHand.length === 1) {
-    chatRef.push({
-      sender: 'SISTEMA',
-      text: `¡${myPlayerName} ha cantado ¡UNO!!`
-    });
+    if (chatRef) {
+      chatRef.push({
+        sender: 'SISTEMA',
+        text: `¡${myPlayerName} ha cantado ¡UNO!!`
+      });
+    }
   } else {
     alert('Solo puedes cantar UNO si te queda exactamente 1 carta.');
   }
 }
 
+// SISTEMA DE CHAT
 function toggleChat() {
   const chatBox = document.getElementById('chat-box');
-  chatBox.classList.toggle('hidden');
-  document.getElementById('chat-badge').innerText = '0';
+  if (chatBox) chatBox.classList.toggle('hidden');
+  const badge = document.getElementById('chat-badge');
+  if (badge) badge.innerText = '0';
 }
 
 function sendChatMessage() {
   const input = document.getElementById('chat-input');
+  if (!input) return;
   const text = input.value.trim();
   if (!text || !chatRef) return;
 
@@ -445,6 +491,7 @@ function handleChatKey(event) {
 
 function renderChat(messagesObj) {
   const container = document.getElementById('chat-messages');
+  if (!container) return;
   container.innerHTML = '';
   
   const msgs = Object.values(messagesObj);
@@ -460,6 +507,7 @@ function renderChat(messagesObj) {
 
 function renderWinners(winnersObj) {
   const list = document.getElementById('winners-history-list');
+  if (!list) return;
   list.innerHTML = '';
   const winners = Object.values(winnersObj).reverse();
 
