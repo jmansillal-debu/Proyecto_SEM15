@@ -10,6 +10,7 @@ const firebaseConfig = {
 };
 
 let db = null;
+let chatListenerRef = null;
 
 function initializeDatabase() {
   try {
@@ -17,7 +18,7 @@ function initializeDatabase() {
     db = firebase.database();
     listenToGlobalWinners();
   } catch (error) {
-    console.error("Error Firebase:", error);
+    console.error("Error al inicializar Firebase:", error);
   }
 }
 initializeDatabase();
@@ -27,7 +28,8 @@ let localState = {
   playerId: '',
   playerName: '',
   isHost: false,
-  unreadCount: 0
+  unreadCount: 0,
+  pendingPlay: null
 };
 
 function showScreen(screenId) {
@@ -36,11 +38,12 @@ function showScreen(screenId) {
   if (target) target.classList.add('active');
 }
 
-/* HISTORIAL DE GANADORES EN TIEMPO REAL */
+/* HISTORIAL DE GANADORES */
 function listenToGlobalWinners() {
   if (!db) return;
   db.ref('winners_history').limitToLast(8).on('value', snapshot => {
     const ul = document.getElementById('winners-history-list');
+    if (!ul) return;
     ul.innerHTML = '';
     const data = snapshot.val();
     if (!data) {
@@ -64,7 +67,7 @@ function registerWinner(winnerName) {
   });
 }
 
-/* SALA Y LOBBY */
+/* CREAR Y UNIRSE A SALA */
 function createRoom() {
   const name = document.getElementById('player-name-input').value.trim();
   if (!name) return alert("Ingresa tu apodo.");
@@ -85,6 +88,7 @@ function createRoom() {
     }
   }).then(() => {
     listenToRoom();
+    listenToChat();
     showScreen('screen-lobby');
   });
 }
@@ -92,7 +96,7 @@ function createRoom() {
 function joinRoom() {
   const name = document.getElementById('player-name-input').value.trim();
   const code = document.getElementById('room-code-input').value.trim().toUpperCase();
-  if (!name || !code) return alert("Ingresa apodo y código.");
+  if (!name || !code) return alert("Ingresa tu apodo y el código.");
 
   localState.playerName = name;
   localState.playerId = 'p_' + Math.random().toString(36).substring(2, 7);
@@ -105,17 +109,85 @@ function joinRoom() {
       name, hand: [], id: localState.playerId
     }).then(() => {
       listenToRoom();
+      listenToChat();
       showScreen('screen-lobby');
     });
   });
 }
 
-/* GENERAR MAZO SOLAMENTE CON CARTAS SUMATORIAS (+2, +4, +5) */
+/* SISTEMA DE CHAT EN TIEMPO REAL */
+function listenToChat() {
+  if (!db || !localState.roomCode) return;
+  
+  if (chatListenerRef) chatListenerRef.off();
+  
+  const chatContainer = document.getElementById('chat-messages');
+  if (chatContainer) chatContainer.innerHTML = '';
+
+  chatListenerRef = db.ref(`chats/${localState.roomCode}`);
+  chatListenerRef.on('child_added', snapshot => {
+    const msg = snapshot.val();
+    if (msg) appendChatMessage(msg);
+  });
+}
+
+function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !localState.roomCode) return;
+
+  db.ref(`chats/${localState.roomCode}`).push({
+    sender: localState.playerName || 'Jugador',
+    text: text,
+    timestamp: Date.now()
+  }).then(() => {
+    input.value = '';
+  }).catch(err => alert("Error enviando mensaje: " + err.message));
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter') sendChatMessage();
+}
+
+function appendChatMessage(msg) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+
+  const el = document.createElement('div');
+  el.className = 'chat-msg';
+  el.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text}`;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+
+  const box = document.getElementById('chat-box');
+  if (box && box.classList.contains('hidden')) {
+    localState.unreadCount++;
+    const badge = document.getElementById('chat-badge');
+    if (badge) badge.textContent = localState.unreadCount;
+  }
+}
+
+function toggleChat() {
+  const box = document.getElementById('chat-box');
+  if (!box) return;
+  box.classList.toggle('hidden');
+  if (!box.classList.contains('hidden')) {
+    localState.unreadCount = 0;
+    const badge = document.getElementById('chat-badge');
+    if (badge) badge.textContent = '0';
+  }
+}
+
+/* GENERACIÓN DE BARAJA COMPLETA */
 function generateDeck() {
   const colors = ['rojo', 'azul', 'verde', 'amarillo'];
   const deck = [];
 
   colors.forEach(color => {
+    for (let i = 0; i <= 9; i++) {
+      deck.push({ color, value: i, label: i.toString() });
+      if (i !== 0) deck.push({ color, value: i, label: i.toString() });
+    }
     deck.push({ color, value: 2, label: '+2' });
     deck.push({ color, value: 2, label: '+2' });
     deck.push({ color, value: 5, label: '+5' });
@@ -123,13 +195,10 @@ function generateDeck() {
 
   for (let i = 0; i < 4; i++) {
     deck.push({ color: 'negro', value: 4, label: '+4' });
+    deck.push({ color: 'negro', value: 0, label: '★' });
   }
 
-  return shuffleDeck(deck);
-}
-
-function shuffleDeck(array) {
-  return array.sort(() => Math.random() - 0.5);
+  return deck.sort(() => Math.random() - 0.5);
 }
 
 function startGame() {
@@ -141,7 +210,7 @@ function startGame() {
     const playerIds = Object.keys(data.players);
 
     playerIds.forEach(id => {
-      data.players[id].hand = deck.splice(0, 5);
+      data.players[id].hand = deck.splice(0, 7);
     });
 
     let topCard = deck.pop();
@@ -157,7 +226,7 @@ function startGame() {
       activeColor: topCard.color,
       playerOrder: playerIds,
       turnIndex: 0,
-      stackCount: topCard.value,
+      stackCount: topCard.label.startsWith('+') ? topCard.value : 0,
       players: data.players
     });
   });
@@ -181,11 +250,6 @@ function listenToRoom() {
       renderGameTable(data);
     }
   });
-
-  db.ref(`chats/${localState.roomCode}`).on('child_added', snapshot => {
-    const msg = snapshot.val();
-    appendChatMessage(msg);
-  });
 }
 
 function createCardHTML(card) {
@@ -208,7 +272,6 @@ function renderGameTable(data) {
   topEl.className = `unocard c-${data.topCard.color}`;
   topEl.innerHTML = createCardHTML(data.topCard);
 
-  /* OPONENTES CON CARTAS VISIBLES EN DORSO */
   const oppZone = document.getElementById('opponents-zone');
   oppZone.innerHTML = '';
   playerOrder.forEach(id => {
@@ -230,7 +293,6 @@ function renderGameTable(data) {
     oppZone.appendChild(cardBox);
   });
 
-  /* MI MANO DE CARTAS */
   const myHand = data.players[localState.playerId]?.hand || [];
   document.getElementById('my-card-count').textContent = myHand.length;
 
@@ -245,7 +307,6 @@ function renderGameTable(data) {
     carousel.appendChild(cardEl);
   });
 
-  /* VERIFICAR SI HAY GANADOR */
   playerOrder.forEach(id => {
     if (data.players[id].hand && data.players[id].hand.length === 0) {
       alert(`¡${data.players[id].name} ha ganado la partida!`);
@@ -259,25 +320,54 @@ function playCard(handIndex, card, roomData) {
     return alert("No es tu turno.");
   }
 
-  const isValid = card.color === 'negro' || card.color === roomData.activeColor || card.label === roomData.topCard.label;
-  if (!isValid) return alert("Carta invalida. Debe coincidir color o valor (+2, +4, +5).");
+  const isStackActive = roomData.stackCount > 0;
+  let isValid = false;
 
+  if (isStackActive) {
+    isValid = card.label.startsWith('+');
+  } else {
+    isValid = card.color === 'negro' || card.color === roomData.activeColor || card.label === roomData.topCard.label;
+  }
+
+  if (!isValid) {
+    return alert(isStackActive ? "Debes responder con una carta de suma (+2, +4, +5) o comer." : "Carta inválida.");
+  }
+
+  if (card.color === 'negro') {
+    localState.pendingPlay = { handIndex, card, roomData };
+    document.getElementById('color-modal').classList.remove('hidden');
+    return;
+  }
+
+  executePlay(handIndex, card, card.color, roomData);
+}
+
+function selectColor(selectedColor) {
+  document.getElementById('color-modal').classList.add('hidden');
+  if (localState.pendingPlay) {
+    const { handIndex, card, roomData } = localState.pendingPlay;
+    localState.pendingPlay = null;
+    executePlay(handIndex, card, selectedColor, roomData);
+  }
+}
+
+function executePlay(handIndex, card, chosenColor, roomData) {
   const roomRef = db.ref('rooms/' + localState.roomCode);
   const myHand = roomData.players[localState.playerId].hand;
   const played = myHand.splice(handIndex, 1)[0];
-
   const nextTurn = (roomData.turnIndex + 1) % roomData.playerOrder.length;
+
+  const addedStack = card.label.startsWith('+') ? card.value : 0;
 
   roomRef.update({
     topCard: played,
-    activeColor: played.color === 'negro' ? roomData.activeColor : played.color,
-    stackCount: roomData.stackCount + played.value,
+    activeColor: chosenColor,
+    stackCount: roomData.stackCount + addedStack,
     turnIndex: nextTurn,
     [`players/${localState.playerId}/hand`]: myHand
   });
 }
 
-/* OBLIGACIÓN DE RECOGER CARTAS SI NO PUEDE SUMAR */
 function drawCardCurrentPlayer() {
   const roomRef = db.ref('rooms/' + localState.roomCode);
 
@@ -287,13 +377,6 @@ function drawCardCurrentPlayer() {
 
     let myHand = data.players[localState.playerId].hand || [];
     let deck = data.deck || generateDeck();
-
-    /* VERIFICA SI EL JUGADOR TIENE CON QUÉ RESPONDER A LA SUMA */
-    const canDefend = myHand.some(c => c.color === 'negro' || c.color === data.activeColor || c.label === data.topCard.label);
-
-    if (data.stackCount > 0 && canDefend) {
-      return alert("¡Tienes cartas para sumar! Debes jugar una carta de suma (+2, +4, +5).");
-    }
 
     const drawCount = data.stackCount > 0 ? data.stackCount : 1;
     for (let i = 0; i < drawCount; i++) {
@@ -313,44 +396,3 @@ function drawCardCurrentPlayer() {
 }
 
 function sayUno() { alert("¡GRITASTE UNO!"); }
-
-/* SISTEMA CHAT TIPO MESSENGER */
-function toggleChat() {
-  const box = document.getElementById('chat-box');
-  box.classList.toggle('hidden');
-  if (!box.classList.contains('hidden')) {
-    localState.unreadCount = 0;
-    document.getElementById('chat-badge').textContent = '0';
-  }
-}
-
-function sendChatMessage() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text || !localState.roomCode) return;
-
-  db.ref(`chats/${localState.roomCode}`).push({
-    sender: localState.playerName,
-    text: text
-  });
-  input.value = '';
-}
-
-function handleChatKey(e) {
-  if (e.key === 'Enter') sendChatMessage();
-}
-
-function appendChatMessage(msg) {
-  const container = document.getElementById('chat-messages');
-  const el = document.createElement('div');
-  el.className = 'chat-msg';
-  el.innerHTML = `<strong>${msg.sender}</strong> ${msg.text}`;
-  container.appendChild(el);
-  container.scrollTop = container.scrollHeight;
-
-  const box = document.getElementById('chat-box');
-  if (box.classList.contains('hidden')) {
-    localState.unreadCount++;
-    document.getElementById('chat-badge').textContent = localState.unreadCount;
-  }
-}
