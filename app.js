@@ -36,9 +36,12 @@ let pendingWildCard = null;
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '🚫', '🔄'];
 
-// Mascotas y Jerga Peruana
+// MASCOTA FLOTANTE, FRASES Y MECÁNICA DE CASTIGO
 const PET_AVATARS = ['🦙', '🦫', '🦜', '🦝'];
 let currentPetIndex = 0;
+let petClickCount = 0;
+let targetClicksForPunishment = Math.floor(Math.random() * (50 - 20 + 1)) + 20;
+
 const PERU_PHRASES = [
   "¡Habla causa!",
   "¡Paga tu +4 pues!",
@@ -47,7 +50,9 @@ const PERU_PHRASES = [
   "¡Ya fuiste mano!",
   "¡Canta UNO o te caigo!",
   "¡Aguanta ahí, pe!",
-  "¡No me florees!"
+  "¡No me florees!",
+  "¡Deja de tocarme pe!",
+  "¡Te me estás pasando de vivo!"
 ];
 
 function showScreen(screenId) {
@@ -296,7 +301,7 @@ function renderGameBoard() {
   const turnDisp = document.getElementById('turn-display');
   if (turnDisp) {
     turnDisp.innerText = isMyTurn ? '¡TU TURNO!' : turnPlayerName;
-    turnDisp.style.color = isMyTurn ? '#ffb300' : '#fff';
+    turnDisp.style.color = isMyTurn ? '#00f2fe' : '#fff';
   }
 
   document.getElementById('active-color-indicator').className = 'color-dot c-' + currentGameState.activeColor;
@@ -322,20 +327,18 @@ function renderOpponents(activeTurnId) {
   board.innerHTML = '';
 
   const opponents = Object.values(currentGameState.players || {}).filter(p => p.id !== myPlayerId);
-  const positions = ['opp-pos-top', 'opp-pos-left', 'opp-pos-right'];
 
-  opponents.forEach((opp, idx) => {
-    const posClass = positions[idx % positions.length];
+  opponents.forEach((opp) => {
     const isActiveClass = opp.id === activeTurnId ? 'active' : '';
 
     let cardsBackHTML = '';
     const cardCount = (opp.hand || []).length;
-    for (let i = 0; i < Math.min(cardCount, 5); i++) {
+    for (let i = 0; i < Math.min(cardCount, 6); i++) {
       cardsBackHTML += `<div class="mini-card-back"></div>`;
     }
 
     const div = document.createElement('div');
-    div.className = `opponent-card ${posClass} ${isActiveClass}`;
+    div.className = `opponent-card ${isActiveClass}`;
     div.innerHTML = `
       <span class="opp-name">${opp.name} (${cardCount})</span>
       <div class="opp-hand-visual">${cardsBackHTML}</div>
@@ -409,8 +412,6 @@ function executeMove(card, chosenColor) {
   let newStack = currentGameState.stack || 0;
   if (card.value === '+2') newStack += 2;
   if (card.value === '+4') newStack += 4;
-
-  triggerPetInteraction();
 
   // VERIFICAR GANADOR
   if (myHand.length === 0) {
@@ -511,7 +512,7 @@ function sayUno() {
   }
 }
 
-// CHAT LEFT 4 DEAD 2
+// CHAT LEFT 4 DEAD 2 (MODIFICADO: PERSISTENTE HASTA 5 MENSAJES)
 function handleChatKey(event) {
   if (event.key === 'Enter') {
     const input = document.getElementById('l4d-chat-input');
@@ -541,27 +542,84 @@ function renderL4DMessage(msgData) {
 
   container.appendChild(msgEl);
 
-  setTimeout(() => {
-    msgEl.remove();
-  }, 6000);
+  // Mantiene un máximo de 5 mensajes en pantalla; elimina el más antiguo al superar ese límite
+  if (container.children.length > 5) {
+    container.removeChild(container.firstChild);
+  }
 }
 
-// MASCOTA INTERACTIVA
-function triggerPetInteraction() {
+// MASCOTA FLOTANTE Y INTERACCIÓN DE CASTIGO POR CLICKS
+function movePetRandomly() {
+  const pet = document.getElementById('floating-pet');
+  if (!pet) return;
+
+  const padding = 100;
+  const maxX = window.innerWidth - padding;
+  const maxY = window.innerHeight - padding;
+
+  const randomX = Math.floor(Math.random() * maxX) + 20;
+  const randomY = Math.floor(Math.random() * maxY) + 20;
+
+  pet.style.left = `${randomX}px`;
+  pet.style.top = `${randomY}px`;
+}
+
+// Movimiento cada 3.5 segundos
+setInterval(movePetRandomly, 3500);
+window.addEventListener('DOMContentLoaded', movePetRandomly);
+
+function handlePetClick() {
+  petClickCount++;
+
   const petEl = document.getElementById('pet-avatar');
   const speechEl = document.getElementById('pet-speech');
-  if (!petEl || !speechEl) return;
 
   currentPetIndex = (currentPetIndex + 1) % PET_AVATARS.length;
-  petEl.innerText = PET_AVATARS[currentPetIndex];
+  if (petEl) petEl.innerText = PET_AVATARS[currentPetIndex];
 
   const randomPhrase = PERU_PHRASES[Math.floor(Math.random() * PERU_PHRASES.length)];
-  speechEl.innerText = randomPhrase;
-  speechEl.classList.remove('hidden');
+  if (speechEl) {
+    speechEl.innerText = randomPhrase;
+    speechEl.classList.remove('hidden');
+    setTimeout(() => speechEl.classList.add('hidden'), 2000);
+  }
 
-  setTimeout(() => {
-    speechEl.classList.add('hidden');
-  }, 2500);
+  // ALCANZÓ EL LÍMITE SECRETO DE CLICKS (ENTRE 20 Y 50)
+  if (petClickCount >= targetClicksForPunishment) {
+    petClickCount = 0;
+    targetClicksForPunishment = Math.floor(Math.random() * (50 - 20 + 1)) + 20; // Reiniciar meta
+
+    const penaltyCards = Math.floor(Math.random() * 4) + 2; // Otorga entre 2 y 8 cartas de castigo
+    if (speechEl) {
+      speechEl.innerText = `¡YA ME CANSÉ! ¡TOMA +${penaltyCards} CARTAS! 🦙💥`;
+      speechEl.classList.remove('hidden');
+      setTimeout(() => speechEl.classList.add('hidden'), 3000);
+    }
+
+    if (currentGameState && currentGameState.status === 'playing') {
+      let deck = [...(currentGameState.deck || [])];
+      let myHand = [...(currentGameState.players[myPlayerId].hand || [])];
+
+      if (deck.length < penaltyCards) deck = generateDeck();
+
+      for (let i = 0; i < penaltyCards; i++) {
+        if (deck.length > 0) myHand.push(deck.pop());
+      }
+
+      if (roomRef) {
+        roomRef.update({
+          deck: deck,
+          [`players/${myPlayerId}/hand`]: myHand
+        });
+      } else {
+        currentGameState.deck = deck;
+        currentGameState.players[myPlayerId].hand = myHand;
+        updateUI();
+      }
+
+      sendL4DMessage('SISTEMA 🦙', `¡${myPlayerName} fastidió a la mascota y recibió +${penaltyCards} cartas de castigo!`);
+    }
+  }
 }
 
 function returnToLobby() {

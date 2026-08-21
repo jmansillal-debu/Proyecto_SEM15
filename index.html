@@ -3,12 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UNO Classic Online</title>
+  <title>UNO Classic Online Deluxe</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
+
+  <!-- MASCOTA PERUANA FLOTANTE Y GLOBAL -->
+  <div id="floating-pet" class="floating-pet-wrapper" onclick="handlePetClick()">
+    <div id="pet-speech" class="speech-bubble hidden">¡Habla causa!</div>
+    <div id="pet-avatar" class="pet-avatar">🦙</div>
+  </div>
 
   <!-- PANTALLA PRINCIPAL / MENU -->
   <div id="screen-menu" class="screen active">
@@ -27,8 +33,8 @@
           <p>Las cartas negras (★ y +4) cambian el color activo a tu elección.</p>
         </div>
         <div class="rule-box">
-          <h3>Cantar UNO</h3>
-          <p>Presiona ¡UNO! cuando te quede una sola carta en la mano.</p>
+          <h3>Mascota Risa / Castigo</h3>
+          <p>¡Cuidado al fastidiar a la mascota! Dale clicks repetidos y podrías comerte una suma aleatoria.</p>
         </div>
       </div>
 
@@ -89,7 +95,7 @@
       <!-- Zona Superior e Intermedia: Oponentes -->
       <div id="opponents-zone" class="opponents-container"></div>
 
-      <!-- Zona Central: Mazo, Descarte, Estado y Mascota -->
+      <!-- Zona Central: Mazo, Descarte y Estado -->
       <div class="center-zone">
         <div class="status-bar">
           <div>Turno de: <span id="turn-display">---</span></div>
@@ -102,16 +108,10 @@
             <div class="unocard card-back">
               <div class="card-inner">UNO</div>
             </div>
-            <span>Robar</span>
+            <span>ROBAR</span>
           </div>
 
           <div id="top-card" class="unocard"></div>
-
-          <!-- MASCOTA PERUANA INTERACTIVA -->
-          <div class="pet-wrapper" onclick="triggerPetInteraction()">
-            <div id="pet-speech" class="speech-bubble hidden">¡Habla causa!</div>
-            <div id="pet-avatar" class="pet-avatar">🦙</div>
-          </div>
         </div>
       </div>
 
@@ -127,7 +127,7 @@
 
     </div>
 
-    <!-- CHAT ESTILO LEFT 4 DEAD 2 (TRANSPARENTE Y OVERLAY) -->
+    <!-- CHAT ESTILO LEFT 4 DEAD 2 (PERSISTENTE / HASTA 5 MENSAJES) -->
     <div id="l4d-chat-container" class="l4d-chat">
       <div id="l4d-chat-messages" class="l4d-messages"></div>
       <div class="l4d-input-row">
@@ -151,9 +151,9 @@
     <!-- Modal Anuncio de Ganador Global -->
     <div id="winner-modal" class="modal hidden">
       <div class="modal-content winner-box">
-        <h1 class="winner-title">👑 ¡ GANADOR ! 👑</h1>
+        <h1 class="winner-title">👑 ¡TENEMOS GANADOR! 👑</h1>
         <p id="winner-name-display" class="winner-name">---</p>
-        <p class="winner-sub">¡Ha ganado la partida !</p>
+        <p class="winner-sub">¡Ha ganado la partida!</p>
         <button class="btn btn-yellow" onclick="returnToLobby()">VOLVER AL LOBBY</button>
       </div>
     </div>
