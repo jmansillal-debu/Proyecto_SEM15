@@ -1,18 +1,29 @@
-// SUSTITUYE ESTE BLOQUE CON LAS CREDENCIALES REALES DE TU PROYECTO DE FIREBASE:
 const firebaseConfig = {
-  apiKey: "TU_API_KEY_REAL",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com",
-  projectId: "tu-proyecto",
-  storageBucket: "tu-proyecto.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef123456"
+  apiKey: "AIzaSyD3ENYHqV1eFLPUMAc6HnusYG7-6S-iyqg",
+  authDomain: "proyectouno-84196.firebaseapp.com",
+  databaseURL: "https://proyectouno-84196-default-rtdb.firebaseio.com",
+  projectId: "proyectouno-84196",
+  storageBucket: "proyectouno-84196.appspot.com",
+  messagingSenderId: "926454626159",
+  appId: "1:926454626159:web:f1cfb4B36a810ac1a91a9a",
+  measurementId: "G-V966LGLNZB"
 };
 
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
+let db = null;
+let isFirebaseConnected = false;
+
+// Intentar inicializar Firebase
+try {
+  if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "TU_API_KEY_REAL") {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    db = firebase.database();
+    isFirebaseConnected = true;
+  }
+} catch (e) {
+  console.warn("Firebase no está configurado correctamente. Usando modo de prueba local.", e);
 }
-const db = firebase.database();
 
 // Estado global del cliente
 let myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
@@ -45,10 +56,9 @@ function getPlayerName() {
 
 function createRoom() {
   if (!getPlayerName()) return;
-  
+
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   currentRoomCode = code;
-  roomRef = db.ref('rooms/' + code);
 
   const initialRoomData = {
     code: code,
@@ -57,7 +67,7 @@ function createRoom() {
     stack: 0,
     activeColor: 'rojo',
     currentTurnIndex: 0,
-    turnOrder: [],
+    turnOrder: [myPlayerId],
     topCard: null,
     deck: generateDeck(),
     players: {
@@ -71,15 +81,30 @@ function createRoom() {
     }
   };
 
-  roomRef.set(initialRoomData)
-    .then(() => {
-      listenToRoom();
-      showScreen('screen-lobby');
-    })
-    .catch(err => {
-      console.error("Error al crear la sala:", err);
-      alert("Error al conectar con la base de datos: " + err.message);
-    });
+  if (isFirebaseConnected && db) {
+    roomRef = db.ref('rooms/' + code);
+    roomRef.set(initialRoomData)
+      .then(() => {
+        listenToRoom();
+        showScreen('screen-lobby');
+      })
+      .catch(err => {
+        console.error("Error al crear la sala en Firebase:", err);
+        alert("Error de conexión con Firebase. Iniciando en modo local.");
+        startLocalRoom(initialRoomData);
+      });
+  } else {
+    // Modo Local
+    startLocalRoom(initialRoomData);
+  }
+}
+
+function startLocalRoom(initialData) {
+  currentGameState = initialData;
+  const display = document.getElementById('lobby-code-display');
+  if (display) display.innerText = currentRoomCode;
+  updateUI();
+  showScreen('screen-lobby');
 }
 
 function joinRoom() {
@@ -91,34 +116,36 @@ function joinRoom() {
   }
 
   currentRoomCode = code;
-  roomRef = db.ref('rooms/' + code);
 
-  roomRef.once('value', snapshot => {
-    if (!snapshot.exists()) {
-      alert('La sala no existe.');
-      return;
-    }
-    const data = snapshot.val();
-    if (data.status !== 'waiting') {
-      alert('La partida ya ha comenzado o ha finalizado.');
-      return;
-    }
+  if (isFirebaseConnected && db) {
+    roomRef = db.ref('rooms/' + code);
+    roomRef.once('value', snapshot => {
+      if (!snapshot.exists()) {
+        alert('La sala no existe.');
+        return;
+      }
+      const data = snapshot.val();
+      if (data.status !== 'waiting') {
+        alert('La partida ya ha comenzado o ha finalizado.');
+        return;
+      }
 
-    roomRef.child('players/' + myPlayerId).set({
-      id: myPlayerId,
-      name: myPlayerName,
-      hand: [],
-      saidUno: false,
-      isHost: false
-    }).then(() => {
-      listenToRoom();
-      showScreen('screen-lobby');
-    }).catch(err => {
-      alert("Error al unirse a la sala: " + err.message);
+      roomRef.child('players/' + myPlayerId).set({
+        id: myPlayerId,
+        name: myPlayerName,
+        hand: [],
+        saidUno: false,
+        isHost: false
+      }).then(() => {
+        listenToRoom();
+        showScreen('screen-lobby');
+      }).catch(err => {
+        alert("Error al unirse a la sala: " + err.message);
+      });
     });
-  }, err => {
-    alert("Error de lectura en base de datos: " + err.message);
-  });
+  } else {
+    alert('Modo local: Para jugar multijugador entre varios dispositivos, debes ingresar tu API Key de Firebase en app.js.');
+  }
 }
 
 // LÓGICA DE BARAJA Y JUEGO
@@ -144,60 +171,72 @@ function generateDeck() {
 function listenToRoom() {
   const display = document.getElementById('lobby-code-display');
   if (display) display.innerText = currentRoomCode;
-  
-  roomRef.on('value', snapshot => {
-    if (!snapshot.exists()) return;
-    currentGameState = snapshot.val();
-    updateUI();
-  });
 
-  // Escuchar chat
-  chatRef = db.ref('chats/' + currentRoomCode);
-  chatRef.on('value', snapshot => {
-    if (!snapshot.exists()) return;
-    renderChat(snapshot.val());
-  });
+  if (roomRef) {
+    roomRef.on('value', snapshot => {
+      if (!snapshot.exists()) return;
+      currentGameState = snapshot.val();
+      updateUI();
+    });
+  }
+
+  if (isFirebaseConnected && db) {
+    chatRef = db.ref('chats/' + currentRoomCode);
+    chatRef.on('value', snapshot => {
+      if (!snapshot.exists()) return;
+      renderChat(snapshot.val());
+    });
+  }
 }
 
 // Cargar Historial de Ganadores al iniciar
-db.ref('winners').limitToLast(5).on('value', snapshot => {
+if (isFirebaseConnected && db) {
+  db.ref('winners').limitToLast(5).on('value', snapshot => {
+    const list = document.getElementById('winners-history-list');
+    if (!snapshot.exists()) {
+      if (list) list.innerHTML = '<li style="padding:10px; opacity:0.6;">Sin victorias aún</li>';
+      return;
+    }
+    renderWinners(snapshot.val());
+  }, err => {
+    console.error("Error al cargar historial:", err);
+    setFallbackWinners();
+  });
+} else {
+  window.addEventListener('DOMContentLoaded', () => {
+    setFallbackWinners();
+  });
+}
+
+function setFallbackWinners() {
   const list = document.getElementById('winners-history-list');
-  if (!snapshot.exists()) {
-    if (list) list.innerHTML = '<li style="padding:10px; opacity:0.6;">Sin victorias aún</li>';
-    return;
+  if (list) {
+    list.innerHTML = `
+      <li class="winner-item"><span>Demo Player</span> <span>12:00</span></li>
+      <li class="winner-item"><span>Mesa Lista</span> <span>Local</span></li>
+    `;
   }
-  renderWinners(snapshot.val());
-}, err => {
-  console.error("Error al cargar historial de ganadores:", err);
-  const list = document.getElementById('winners-history-list');
-  if (list) list.innerHTML = '<li style="color:#ff6b6b; padding:10px;">Error de conexión con Firebase</li>';
-});
+}
 
 function startGame() {
-  if (!currentGameState || currentGameState.host !== myPlayerId) return;
+  if (!currentGameState) return;
 
   const playerKeys = Object.keys(currentGameState.players || {});
-  if (playerKeys.length < 1) {
-    alert('Se necesitan más jugadores para iniciar.');
-    return;
-  }
-
   let deck = [...currentGameState.deck];
   let players = { ...currentGameState.players };
 
-  // Repartir 7 cartas a cada uno
   playerKeys.forEach(pId => {
     players[pId].hand = deck.splice(0, 7);
   });
 
-  // Obtener primera carta válida (no especial negra)
   let topCard = deck.pop();
   while (topCard && topCard.color === 'negro') {
     deck.unshift(topCard);
     topCard = deck.pop();
   }
 
-  roomRef.update({
+  const updatedState = {
+    ...currentGameState,
     status: 'playing',
     deck: deck,
     players: players,
@@ -205,10 +244,17 @@ function startGame() {
     activeColor: topCard ? topCard.color : 'rojo',
     turnOrder: playerKeys,
     currentTurnIndex: 0
-  });
+  };
+
+  currentGameState = updatedState;
+
+  if (roomRef) {
+    roomRef.update(updatedState);
+  } else {
+    updateUI();
+  }
 }
 
-// ACTUALIZACIÓN DE INTERFAZ (UI)
 function updateUI() {
   if (!currentGameState) return;
 
@@ -217,7 +263,7 @@ function updateUI() {
     const playersArr = Object.values(currentGameState.players || {});
     const pCount = document.getElementById('player-count');
     if (pCount) pCount.innerText = playersArr.length;
-    
+
     const list = document.getElementById('lobby-players-list');
     if (list) {
       list.innerHTML = playersArr.map(p => `<li>${p.name} ${p.isHost ? '👑' : ''}</li>`).join('');
@@ -225,7 +271,7 @@ function updateUI() {
 
     const btnStart = document.getElementById('btn-start-game');
     const msgWait = document.getElementById('waiting-msg');
-    
+
     if (currentGameState.host === myPlayerId) {
       if (btnStart) btnStart.style.display = 'block';
       if (msgWait) msgWait.style.display = 'none';
@@ -249,14 +295,13 @@ function renderGameBoard() {
     turnDisp.innerText = isMyTurn ? '¡TU TURNO!' : turnPlayerName;
     turnDisp.style.color = isMyTurn ? '#ffb300' : '#fff';
   }
-  
+
   const colorInd = document.getElementById('active-color-indicator');
   if (colorInd) colorInd.className = 'color-dot c-' + currentGameState.activeColor;
 
   const stackDisp = document.getElementById('stack-display');
   if (stackDisp) stackDisp.innerText = '+' + (currentGameState.stack || 0);
 
-  // Carta centro (Descarte)
   const topCardSpot = document.getElementById('top-card');
   if (topCardSpot && currentGameState.topCard) {
     topCardSpot.className = `unocard c-${currentGameState.topCard.color}`;
@@ -267,10 +312,7 @@ function renderGameBoard() {
     `;
   }
 
-  // Oponentes
   renderOpponents(turnPlayerId);
-
-  // Mi mano
   renderMyHand(isMyTurn);
 }
 
@@ -285,7 +327,7 @@ function renderOpponents(activeTurnId) {
   opponents.forEach((opp, idx) => {
     const posClass = positions[idx % positions.length];
     const isActiveClass = opp.id === activeTurnId ? 'active' : '';
-    
+
     let cardsBackHTML = '';
     const cardCount = (opp.hand || []).length;
     for (let i = 0; i < Math.min(cardCount, 5); i++) {
@@ -330,7 +372,6 @@ function renderMyHand(isMyTurn) {
   });
 }
 
-// JUGAR CARTA Y REGLAS DE TURNO
 function playCard(card) {
   const top = currentGameState.topCard;
   const activeColor = currentGameState.activeColor;
@@ -338,13 +379,11 @@ function playCard(card) {
 
   let isValid = false;
 
-  // Lógica con acumulaciones activas
   if (stack > 0) {
     if (card.value === '+2' || card.value === '+4') {
       isValid = true;
     }
   } else {
-    // Lógica standard de jugada
     if (card.color === 'negro' || card.color === activeColor || card.value === top.value) {
       isValid = true;
     }
@@ -378,36 +417,45 @@ function executeMove(card, chosenColor) {
   if (card.value === '+2') newStack += 2;
   if (card.value === '+4') newStack += 4;
 
-  // Comprobar Victoria
   if (myHand.length === 0) {
-    db.ref('winners').push({
-      name: myPlayerName,
-      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    });
-
+    if (roomRef) {
+      db.ref('winners').push({
+        name: myPlayerName,
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+      roomRef.update({ status: 'waiting' });
+    }
     alert('¡HAS GANADO LA PARTIDA!');
-    roomRef.update({ status: 'waiting' });
+    showScreen('screen-menu');
     return;
   }
 
-  // Siguiente Turno
   let nextIndex = currentGameState.currentTurnIndex;
   let step = card.value === '🔄' ? -1 : 1;
-  
+
   if (card.value === '🚫') {
     nextIndex = getNextTurnIndex(nextIndex, step * 2);
   } else {
     nextIndex = getNextTurnIndex(nextIndex, step);
   }
 
-  const updates = {};
-  updates[`players/${myPlayerId}/hand`] = myHand;
-  updates['topCard'] = card;
-  updates['activeColor'] = chosenColor;
-  updates['stack'] = newStack;
-  updates['currentTurnIndex'] = nextIndex;
+  currentGameState.players[myPlayerId].hand = myHand;
+  currentGameState.topCard = card;
+  currentGameState.activeColor = chosenColor;
+  currentGameState.stack = newStack;
+  currentGameState.currentTurnIndex = nextIndex;
 
-  roomRef.update(updates);
+  if (roomRef) {
+    const updates = {};
+    updates[`players/${myPlayerId}/hand`] = myHand;
+    updates['topCard'] = card;
+    updates['activeColor'] = chosenColor;
+    updates['stack'] = newStack;
+    updates['currentTurnIndex'] = nextIndex;
+    roomRef.update(updates);
+  } else {
+    updateUI();
+  }
 }
 
 function getNextTurnIndex(currentIndex, step) {
@@ -425,7 +473,6 @@ function drawCardCurrentPlayer() {
   let myHand = [...(currentGameState.players[myPlayerId].hand || [])];
   let stack = currentGameState.stack || 0;
 
-  // Si no hay cartas suficientes en el mazo
   if (deck.length < Math.max(1, stack)) {
     deck = generateDeck();
   }
@@ -439,12 +486,21 @@ function drawCardCurrentPlayer() {
 
   const nextIndex = getNextTurnIndex(currentGameState.currentTurnIndex, 1);
 
-  roomRef.update({
-    deck: deck,
-    stack: 0,
-    [`players/${myPlayerId}/hand`]: myHand,
-    currentTurnIndex: nextIndex
-  });
+  currentGameState.deck = deck;
+  currentGameState.stack = 0;
+  currentGameState.players[myPlayerId].hand = myHand;
+  currentGameState.currentTurnIndex = nextIndex;
+
+  if (roomRef) {
+    roomRef.update({
+      deck: deck,
+      stack: 0,
+      [`players/${myPlayerId}/hand`]: myHand,
+      currentTurnIndex: nextIndex
+    });
+  } else {
+    updateUI();
+  }
 }
 
 function sayUno() {
@@ -455,13 +511,14 @@ function sayUno() {
         sender: 'SISTEMA',
         text: `¡${myPlayerName} ha cantado ¡UNO!!`
       });
+    } else {
+      alert('¡Has cantado UNO!');
     }
   } else {
     alert('Solo puedes cantar UNO si te queda exactamente 1 carta.');
   }
 }
 
-// SISTEMA DE CHAT
 function toggleChat() {
   const chatBox = document.getElementById('chat-box');
   if (chatBox) chatBox.classList.toggle('hidden');
@@ -473,13 +530,14 @@ function sendChatMessage() {
   const input = document.getElementById('chat-input');
   if (!input) return;
   const text = input.value.trim();
-  if (!text || !chatRef) return;
+  if (!text) return;
 
-  chatRef.push({
-    sender: myPlayerName,
-    text: text
-  });
-
+  if (chatRef) {
+    chatRef.push({
+      sender: myPlayerName,
+      text: text
+    });
+  }
   input.value = '';
 }
 
@@ -493,7 +551,7 @@ function renderChat(messagesObj) {
   const container = document.getElementById('chat-messages');
   if (!container) return;
   container.innerHTML = '';
-  
+
   const msgs = Object.values(messagesObj);
   msgs.forEach(m => {
     const div = document.createElement('div');
