@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UNO Classic Online Deluxe</title>
+  <title>UNO Dark Metal Neón</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
+
+  <!-- ELEMENTO PARA ANIMACIÓN DE VOLEO DE CARTAS DE LA MASCOTA -->
+  <div id="fly-card-container"></div>
 
   <!-- MASCOTA 1: TROLL / CASTIGO -->
   <div id="bad-pet" class="floating-pet-wrapper" onclick="handleBadPetClick()">
@@ -28,50 +31,50 @@
       
       <!-- Panel Izquierdo: Reglas -->
       <div class="panel panel-rules">
-        <h2>Reglas del Juego</h2>
-        <p class="subtitle">UNO DELUXE</p>
+        <h2>REGLAS METAL</h2>
+        <p class="subtitle">UNO DARK EDITION</p>
         <div class="rule-box">
           <h3>Super Acumulación (+2, +4, +6, +8)</h3>
-          <p>Lanza sumas mayores para acumular castigos masivos a tus rivales.</p>
+          <p>Suma golpes destructivos contra tus oponentes sin piedad.</p>
         </div>
         <div class="rule-box">
-          <h3>Temporizador de Turno (10s)</h3>
-          <p>¡Piensa rápido! Si tardas más de 10 segundos recibirás un castigo de 2 a 3 cartas.</p>
+          <h3>Temporizador Rápido (10s)</h3>
+          <p>Si dudas por más de 10 segundos, sufrirás un castigo de 2 a 3 cartas.</p>
         </div>
         <div class="rule-box">
-          <h3>Mascotas Flotantes</h3>
-          <p>🦙 **Mala:** 5-10 clicks te dan +2 o +3 cartas.<br>🦜 **Buena:** 30-50 clicks te quitan 1 o 2 cartas.</p>
+          <h3>Mascotas en Pantalla</h3>
+          <p>🦙 **Mala:** 5-10 clicks = Castigo +2 o +3.<br>🦜 **Buena:** 30-50 clicks = Roba y quita tus cartas volando.</p>
         </div>
       </div>
 
       <!-- Panel Central: Crear/Unirse -->
       <div class="panel panel-main">
         <div class="title-banner">
-          <h1>UNO CLASSIC</h1>
-          <p>ONLINE MULTIPLAYER</p>
+          <h1>UNO METAL</h1>
+          <p>ULTIMATE NEON EDITION</p>
         </div>
         
         <div class="input-group">
-          <label>Tu Apodo</label>
-          <input type="text" id="player-name-input" placeholder="Introduce tu apodo..." maxlength="12">
+          <label>APODO DEL GUERRERO</label>
+          <input type="text" id="player-name-input" placeholder="Tu nombre..." maxlength="12">
         </div>
 
-        <button class="btn btn-red" onclick="createRoom()">CREAR MESA</button>
+        <button class="btn btn-green-neon" onclick="createRoom()">CREAR MESA</button>
 
-        <div class="divider">O ÚNETE A UNA</div>
+        <div class="divider">O ÚNETE A LA BATALLA</div>
 
         <div class="join-group">
           <input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="6">
-          <button class="btn btn-yellow" onclick="joinRoom()">UNIRSE</button>
+          <button class="btn btn-red-matte" onclick="joinRoom()">UNIRSE</button>
         </div>
       </div>
 
       <!-- Panel Derecho: Historial -->
       <div class="panel panel-winners">
-        <h2>🏆 Historial</h2>
-        <p class="subtitle">ÚLTIMAS PARTIDAS</p>
+        <h2>🏆 SALA DE HONOR</h2>
+        <p class="subtitle">ÚLTIMAS VICTORIAS</p>
         <ul id="winners-history-list" class="winners-list">
-          <li class="empty-msg">Cargando historial...</li>
+          <li class="empty-msg">Cargando victorias...</li>
         </ul>
       </div>
 
@@ -81,15 +84,15 @@
   <!-- PANTALLA SALA DE ESPERA (LOBBY) -->
   <div id="screen-lobby" class="screen">
     <div class="lobby-card">
-      <h2>SALA DE ESPERA</h2>
-      <p>CÓDIGO DE SALA: <strong id="lobby-code-display">------</strong></p>
+      <h2>MESA DE ESPERA</h2>
+      <p>CÓDIGO DE SALA: <strong id="lobby-code-display" class="neon-text">------</strong></p>
       
       <div class="lobby-players">
         <h3>Jugadores Conectados (<span id="player-count">0</span>):</h3>
         <ul id="lobby-players-list"></ul>
       </div>
 
-      <button id="btn-start-game" class="btn btn-red" onclick="startGame()" style="display:none;">INICIAR JUEGO</button>
+      <button id="btn-start-game" class="btn btn-green-neon" onclick="startGame()" style="display:none;">INICIAR BATALLA</button>
       <p id="waiting-msg" style="display:none;">Esperando que el anfitrión inicie la partida...</p>
     </div>
   </div>
@@ -98,14 +101,14 @@
   <div id="screen-game" class="screen">
     <div class="game-container">
       
-      <!-- Zona Superior: Oponentes con Iconos -->
+      <!-- Zona Superior: Oponentes -->
       <div id="opponents-zone" class="opponents-container"></div>
 
-      <!-- Zona Central: Mazo, Descarte y Estado -->
+      <!-- Zona Central -->
       <div class="center-zone">
         <div class="status-bar">
           <div>Turno: <span id="turn-display">---</span></div>
-          <div class="timer-badge">⏳ <span id="timer-display">10</span>s</div>
+          <div class="timer-badge">⚡ <span id="timer-display">10</span>s</div>
           <div>Color: <span id="active-color-indicator" class="color-dot"></span></div>
           <div>Suma: <span id="stack-display">+0</span></div>
         </div>
@@ -134,18 +137,18 @@
 
     </div>
 
-    <!-- CHAT EN ESQUINA INFERIOR DERECHA (FUERA DEL ÁREA DE CARTAS) -->
+    <!-- CHAT ESQUINA INFERIOR DERECHA -->
     <div id="l4d-chat-container" class="l4d-chat-right">
       <div id="l4d-chat-messages" class="l4d-messages"></div>
       <div class="l4d-input-row">
-        <input type="text" id="l4d-chat-input" placeholder="Enter para chatear..." onkeypress="handleChatKey(event)">
+        <input type="text" id="l4d-chat-input" placeholder="Mensaje + Enter..." onkeypress="handleChatKey(event)">
       </div>
     </div>
 
     <!-- Modal Cambio de Color -->
     <div id="color-modal" class="modal hidden">
       <div class="modal-content">
-        <h3>Elige un Color</h3>
+        <h3>SELECCIONA COLOR</h3>
         <div class="color-buttons">
           <button class="btn-color c-rojo" onclick="selectColor('rojo')">Rojo</button>
           <button class="btn-color c-azul" onclick="selectColor('azul')">Azul</button>
@@ -158,10 +161,10 @@
     <!-- Modal Anuncio de Ganador -->
     <div id="winner-modal" class="modal hidden">
       <div class="modal-content winner-box">
-        <h1 class="winner-title">👑 ¡TENEMOS GANADOR! 👑</h1>
+        <h1 class="winner-title">⚡ ¡CAMPEÓN ABSOLUTO! ⚡</h1>
         <p id="winner-name-display" class="winner-name">---</p>
-        <p class="winner-sub">¡Ha ganado la partida!</p>
-        <button class="btn btn-yellow" onclick="returnToLobby()">VOLVER AL LOBBY</button>
+        <p class="winner-sub">Ha dominado la mesa metal.</p>
+        <button class="btn btn-green-neon" onclick="returnToLobby()">VOLVER AL LOBBY</button>
       </div>
     </div>
 

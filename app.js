@@ -31,19 +31,19 @@ let chatRef = null;
 let currentGameState = null;
 let pendingWildCard = null;
 
-// Temporizador de 10 segundos
+// Temporizador
 let turnTimer = null;
 let timeLeft = 10;
 
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '+4', '+6', '+8', '🚫', '🔄'];
 
-// CONFIGURACIÓN DE MASCOTAS
+// Clicks Mascotas
 let badPetClicks = 0;
-let targetBadClicks = Math.floor(Math.random() * (10 - 5 + 1)) + 5; // 5 a 10 clicks
+let targetBadClicks = Math.floor(Math.random() * (10 - 5 + 1)) + 5;
 
 let goodPetClicks = 0;
-let targetGoodClicks = Math.floor(Math.random() * (50 - 30 + 1)) + 30; // 30 a 50 clicks
+let targetGoodClicks = Math.floor(Math.random() * (50 - 30 + 1)) + 30;
 
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -221,7 +221,6 @@ function updateUI() {
   }
 }
 
-// TEMPORIZADOR DE TURNO (10 SEGUNDOS)
 function resetTurnTimer() {
   clearInterval(turnTimer);
   timeLeft = 10;
@@ -241,8 +240,8 @@ function resetTurnTimer() {
 }
 
 function handleTurnTimeout() {
-  const penalty = Math.floor(Math.random() * 2) + 2; // 2 a 3 cartas
-  sendL4DMessage('TIEMPO ⏳', `¡${myPlayerName} agotó sus 10s y recibe +${penalty} cartas!`);
+  const penalty = Math.floor(Math.random() * 2) + 2;
+  sendL4DMessage('TIEMPO ⏳', `¡${myPlayerName} agotó 10s y recibe +${penalty} cartas!`);
   applyCardPenalty(penalty);
 }
 
@@ -254,7 +253,7 @@ function renderGameBoard() {
   const turnDisp = document.getElementById('turn-display');
   if (turnDisp) {
     turnDisp.innerText = isMyTurn ? '¡TU TURNO!' : turnPlayerName;
-    turnDisp.style.color = isMyTurn ? '#00ffcc' : '#fff';
+    turnDisp.style.color = isMyTurn ? '#00ff66' : '#fff';
   }
 
   document.getElementById('active-color-indicator').className = 'color-dot c-' + currentGameState.activeColor;
@@ -444,7 +443,6 @@ function sayUno() {
   if (myHand.length === 1) sendL4DMessage(`SISTEMA`, `¡${myPlayerName} dice ¡UNO!!`);
 }
 
-// CHAT EN LA ESQUINA DERECHA
 function handleChatKey(event) {
   if (event.key === 'Enter') {
     const input = document.getElementById('l4d-chat-input');
@@ -473,7 +471,6 @@ function renderL4DMessage(msgData) {
   if (container.children.length > 5) container.removeChild(container.firstChild);
 }
 
-// MASCOTAS Y MOVIMIENTO CONTINUO
 function movePets() {
   ['bad-pet', 'good-pet'].forEach(id => {
     const pet = document.getElementById(id);
@@ -486,7 +483,6 @@ function movePets() {
 setInterval(movePets, 3000);
 window.addEventListener('DOMContentLoaded', movePets);
 
-// MASCOTA 1: TROLL (5-10 CLICKS -> CASTIGO)
 function handleBadPetClick() {
   badPetClicks++;
   const speech = document.getElementById('bad-pet-speech');
@@ -497,7 +493,7 @@ function handleBadPetClick() {
   if (badPetClicks >= targetBadClicks) {
     badPetClicks = 0;
     targetBadClicks = Math.floor(Math.random() * (10 - 5 + 1)) + 5;
-    const penalty = Math.floor(Math.random() * 2) + 2; // +2 o +3 cartas
+    const penalty = Math.floor(Math.random() * 2) + 2;
 
     speech.innerText = `¡TE AVISÉ! +${penalty} CARTAS 🦙💥`;
     speech.classList.remove('hidden');
@@ -509,7 +505,7 @@ function handleBadPetClick() {
   }
 }
 
-// MASCOTA 2: ALIADA (30-50 CLICKS -> AYUDA)
+// MASCOTA BUENA Y ANIMACIÓN DE CARTA VOLANDO
 function handleGoodPetClick() {
   goodPetClicks++;
   const speech = document.getElementById('good-pet-speech');
@@ -520,26 +516,67 @@ function handleGoodPetClick() {
   if (goodPetClicks >= targetGoodClicks) {
     goodPetClicks = 0;
     targetGoodClicks = Math.floor(Math.random() * (50 - 30 + 1)) + 30;
-    const removeCount = Math.floor(Math.random() * 2) + 1; // Quita 1 o 2 cartas
+    const removeCount = Math.floor(Math.random() * 2) + 1;
 
-    speech.innerText = `¡GRACIAS! Te quito ${removeCount} carta(s) 🦜✨`;
+    speech.innerText = `¡ME LLEVO TU CARTA! 🦜✨`;
     speech.classList.remove('hidden');
 
     if (currentGameState && currentGameState.status === 'playing') {
       let myHand = [...(currentGameState.players[myPlayerId].hand || [])];
+
       for (let i = 0; i < removeCount; i++) {
-        if (myHand.length > 1) myHand.pop();
+        if (myHand.length > 1) {
+          myHand.pop();
+          animateFlyCardToPet(); // Lanzar animación por carta
+        }
       }
 
-      if (roomRef) {
-        roomRef.child(`players/${myPlayerId}/hand`).set(myHand);
-      } else {
-        currentGameState.players[myPlayerId].hand = myHand;
-        updateUI();
-      }
-      sendL4DMessage('SISTEMA 🦜', `¡La mascota ayudó a ${myPlayerName} descartando ${removeCount} carta(s)!`);
+      setTimeout(() => {
+        if (roomRef) {
+          roomRef.child(`players/${myPlayerId}/hand`).set(myHand);
+        } else {
+          currentGameState.players[myPlayerId].hand = myHand;
+          updateUI();
+        }
+      }, 800);
+
+      sendL4DMessage('SISTEMA 🦜', `¡La mascota voló y se llevó ${removeCount} carta(s) de ${myPlayerName}!`);
     }
   }
+}
+
+// ANIMACIÓN: VUELO DE LA CARTA HACIA LA MASCOTA BUENA
+function animateFlyCardToPet() {
+  const goodPet = document.getElementById('good-pet');
+  const handContainer = document.getElementById('my-hand');
+  const flyContainer = document.getElementById('fly-card-container');
+
+  if (!goodPet || !handContainer || !flyContainer) return;
+
+  const petRect = goodPet.getBoundingClientRect();
+  const handRect = handContainer.getBoundingClientRect();
+
+  const flyCard = document.createElement('div');
+  flyCard.className = 'flying-card';
+
+  // Iniciar desde la mano
+  flyCard.style.left = `${handRect.left + handRect.width / 2 - 35}px`;
+  flyCard.style.top = `${handRect.top}px`;
+
+  flyContainer.appendChild(flyCard);
+
+  // Mover volando hasta la posición de la mascota
+  requestAnimationFrame(() => {
+    flyCard.style.left = `${petRect.left + 10}px`;
+    flyCard.style.top = `${petRect.top + 10}px`;
+    flyCard.style.transform = 'scale(0.2) rotate(360deg)';
+    flyCard.style.opacity = '0.2';
+  });
+
+  // Eliminar al finalizar animación
+  setTimeout(() => {
+    flyCard.remove();
+  }, 850);
 }
 
 function returnToLobby() {
