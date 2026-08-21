@@ -10,10 +10,16 @@
 </head>
 <body>
 
-  <!-- MASCOTA PERUANA FLOTANTE Y GLOBAL -->
-  <div id="floating-pet" class="floating-pet-wrapper" onclick="handlePetClick()">
-    <div id="pet-speech" class="speech-bubble hidden">¡Habla causa!</div>
-    <div id="pet-avatar" class="pet-avatar">🦙</div>
+  <!-- MASCOTA 1: TROLL / CASTIGO -->
+  <div id="bad-pet" class="floating-pet-wrapper" onclick="handleBadPetClick()">
+    <div id="bad-pet-speech" class="speech-bubble hidden">¡No me toques!</div>
+    <div id="bad-pet-avatar" class="pet-avatar">🦙</div>
+  </div>
+
+  <!-- MASCOTA 2: ALIADA / AYUDA -->
+  <div id="good-pet" class="floating-pet-wrapper" onclick="handleGoodPetClick()">
+    <div id="good-pet-speech" class="speech-bubble hidden">¡Te ayudo causa!</div>
+    <div id="good-pet-avatar" class="pet-avatar">🦜</div>
   </div>
 
   <!-- PANTALLA PRINCIPAL / MENU -->
@@ -23,18 +29,18 @@
       <!-- Panel Izquierdo: Reglas -->
       <div class="panel panel-rules">
         <h2>Reglas del Juego</h2>
-        <p class="subtitle">UNO CLASSIC</p>
+        <p class="subtitle">UNO DELUXE</p>
         <div class="rule-box">
-          <h3>Acumulación (+2, +4)</h3>
-          <p>Responde con otra suma para aumentar el castigo al siguiente jugador.</p>
+          <h3>Super Acumulación (+2, +4, +6, +8)</h3>
+          <p>Lanza sumas mayores para acumular castigos masivos a tus rivales.</p>
         </div>
         <div class="rule-box">
-          <h3>Cartas Especiales</h3>
-          <p>Las cartas negras (★ y +4) cambian el color activo a tu elección.</p>
+          <h3>Temporizador de Turno (10s)</h3>
+          <p>¡Piensa rápido! Si tardas más de 10 segundos recibirás un castigo de 2 a 3 cartas.</p>
         </div>
         <div class="rule-box">
-          <h3>Mascota Risa / Castigo</h3>
-          <p>¡Cuidado al fastidiar a la mascota! Dale clicks repetidos y podrías comerte una suma aleatoria.</p>
+          <h3>Mascotas Flotantes</h3>
+          <p>🦙 **Mala:** 5-10 clicks te dan +2 o +3 cartas.<br>🦜 **Buena:** 30-50 clicks te quitan 1 o 2 cartas.</p>
         </div>
       </div>
 
@@ -60,7 +66,7 @@
         </div>
       </div>
 
-      <!-- Panel Derecho: Ganadores e Historial -->
+      <!-- Panel Derecho: Historial -->
       <div class="panel panel-winners">
         <h2>🏆 Historial</h2>
         <p class="subtitle">ÚLTIMAS PARTIDAS</p>
@@ -92,15 +98,16 @@
   <div id="screen-game" class="screen">
     <div class="game-container">
       
-      <!-- Zona Superior e Intermedia: Oponentes -->
+      <!-- Zona Superior: Oponentes con Iconos -->
       <div id="opponents-zone" class="opponents-container"></div>
 
       <!-- Zona Central: Mazo, Descarte y Estado -->
       <div class="center-zone">
         <div class="status-bar">
-          <div>Turno de: <span id="turn-display">---</span></div>
+          <div>Turno: <span id="turn-display">---</span></div>
+          <div class="timer-badge">⏳ <span id="timer-display">10</span>s</div>
           <div>Color: <span id="active-color-indicator" class="color-dot"></span></div>
-          <div>Acumulado: <span id="stack-display">+0</span></div>
+          <div>Suma: <span id="stack-display">+0</span></div>
         </div>
 
         <div class="table-center">
@@ -115,7 +122,7 @@
         </div>
       </div>
 
-      <!-- Zona Inferior: Mi Mano y Controles -->
+      <!-- Zona Inferior: Mi Mano -->
       <div class="bottom-zone">
         <div class="controls-bar">
           <button class="btn btn-uno" onclick="sayUno()">¡UNO!</button>
@@ -127,11 +134,11 @@
 
     </div>
 
-    <!-- CHAT ESTILO LEFT 4 DEAD 2 (PERSISTENTE / HASTA 5 MENSAJES) -->
-    <div id="l4d-chat-container" class="l4d-chat">
+    <!-- CHAT EN ESQUINA INFERIOR DERECHA (FUERA DEL ÁREA DE CARTAS) -->
+    <div id="l4d-chat-container" class="l4d-chat-right">
       <div id="l4d-chat-messages" class="l4d-messages"></div>
       <div class="l4d-input-row">
-        <input type="text" id="l4d-chat-input" placeholder="Presiona Enter para chatear..." onkeypress="handleChatKey(event)">
+        <input type="text" id="l4d-chat-input" placeholder="Enter para chatear..." onkeypress="handleChatKey(event)">
       </div>
     </div>
 
@@ -148,7 +155,7 @@
       </div>
     </div>
 
-    <!-- Modal Anuncio de Ganador Global -->
+    <!-- Modal Anuncio de Ganador -->
     <div id="winner-modal" class="modal hidden">
       <div class="modal-content winner-box">
         <h1 class="winner-title">👑 ¡TENEMOS GANADOR! 👑</h1>
