@@ -3,83 +3,98 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>UNO Classic Online</title>
+  <title>UNO Tabletop Deluxe</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Outfit:wght@500;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Outfit:wght@600;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- ELEMENTOS DE FONDO -->
-  <div class="game-bg-decor">
-    <div class="floating-card c-rojo"><span>+4</span></div>
-    <div class="floating-card c-azul"><span>+5</span></div>
-    <div class="floating-card c-amarillo"><span>+2</span></div>
+  <!-- FONDO INTERACTIVO PARTÍCULAS/ILUMINACIÓN -->
+  <div class="tabletop-bg">
+    <div class="light-beam"></div>
+    <div class="felt-texture"></div>
   </div>
 
-  <!-- PANTALLA 1: MENU PRINCIPAL -->
+  <!-- PANTALLA 1: MENU Y LOGIN DETALLADO -->
   <section id="screen-menu" class="screen active">
-    <div class="main-menu-container">
-      <aside class="info-sidebar">
-        <header class="sidebar-header">
-          <h2>MESA DE JUEGO MULTIJUGADOR</h2>
-          <p>SISTEMA ONLINE EN TIEMPO REAL</p>
+    <div class="login-wrapper">
+      
+      <!-- CONTENEDOR 1: PANEL DE REGLAS E INFO -->
+      <aside class="wood-card info-card">
+        <header class="card-header amber">
+          <h2>🎲 REGLAS DE LA MESA</h2>
         </header>
-        <div class="sidebar-body">
-          <div class="info-card">
-            <h3>⚡ MECÁNICA DE CARTAS DE SUMA (+2, +4, +5)</h3>
-            <p>El mazo cuenta exclusivamente con cartas sumatorias (+2, +4 y +5). Puedes encadenarlas para transferir el castigo acumulado al siguiente jugador.</p>
+        <div class="card-body scrollable">
+          <div class="rule-box">
+            <h4>⚡ SOLO CARTAS DE SUMA</h4>
+            <p>El mazo únicamente contiene cartas <strong>+2, +4 y +5</strong>. ¡Si alguien las activa, debes encadenar otra o robar el acumulado total!</p>
           </div>
-          <div class="info-card">
-            <h3>🎮 COMPATIBILIDAD Y ESCALA</h3>
-            <p>Diseño auto-ajustable optimizado para pantallas de móviles y PC sin necesidad de realizar zoom.</p>
+          <div class="rule-box">
+            <h4>🔒 OBLIGACIÓN DE COMER</h4>
+            <p>Si la mesa tiene un acumulado y no posees una carta compatible en mano, el sistema te obligará a recoger todo el castigo automáticamente.</p>
+          </div>
+          <div class="rule-box">
+            <h4>👁️ MAZO RIVAL VISIBLE</h4>
+            <p>Puedes ver el dorso de las cartas de tus rivales en vivo para calcular tus estrategias.</p>
           </div>
         </div>
       </aside>
 
-      <div class="card-panel login-panel">
-        <header class="panel-header">
-          <h1 class="panel-title">UNO ONLINE</h1>
-          <p class="panel-subtitle">SISTEMA DE JUEGO MULTIJUGADOR</p>
+      <!-- CONTENEDOR 2: FORMULARIO PRINCIPAL -->
+      <main class="wood-card login-card">
+        <header class="card-header red">
+          <h1>UNO DELUXE</h1>
+          <span>EDICIÓN JUEGO DE MESA</span>
         </header>
-        <div class="panel-body">
-          <div class="field-group">
-            <label for="player-name-input">APODO DE JUGADOR</label>
-            <input type="text" id="player-name-input" placeholder="INGRESA TU NOMBRE" maxlength="12" autocomplete="off">
+        <div class="card-body">
+          <div class="input-group">
+            <label for="player-name-input">👤 TU APODO EN MESA</label>
+            <input type="text" id="player-name-input" placeholder="Ej. Alex_Pro" maxlength="12" autocomplete="off">
           </div>
+
           <div class="actions-stack">
-            <button id="btn-create" class="btn btn-red" type="button" onclick="createRoom()">CREAR SALA</button>
-            <div class="separator">--- UNIRSE A SALA EXISTENTE ---</div>
+            <button id="btn-create" class="btn btn-primary" onclick="createRoom()">CREAR NUEVA MESA</button>
+            <div class="divider"><span>O UNIRSE CON CÓDIGO</span></div>
             <div class="join-row">
               <input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="5" autocomplete="off">
-              <button id="btn-join" class="btn btn-yellow" type="button" onclick="joinRoom()">ENTRAR</button>
+              <button id="btn-join" class="btn btn-secondary" onclick="joinRoom()">ENTRAR</button>
             </div>
           </div>
         </div>
-      </div>
+      </main>
+
+      <!-- CONTENEDOR 3: HISTORIAL DE GANADORES -->
+      <aside class="wood-card history-card">
+        <header class="card-header gold">
+          <h2>🏆 SALÓN DE LA FAMA</h2>
+        </header>
+        <div class="card-body scrollable">
+          <ul id="winners-history-list" class="winners-list">
+            <li class="empty-msg">Cargando victorias recientes...</li>
+          </ul>
+        </div>
+      </aside>
+
     </div>
   </section>
 
   <!-- PANTALLA 2: LOBBY DE ESPERA -->
   <section id="screen-lobby" class="screen">
-    <div class="card-panel">
-      <header class="panel-header">
-        <h2 class="panel-title">SALA DE ESPERA</h2>
-        <p class="panel-subtitle">PREPARANDO JUGADORES</p>
+    <div class="wood-card lobby-card">
+      <header class="card-header green">
+        <h2>SALA DE ESPERA</h2>
+        <span id="lobby-code-display" class="badge">----</span>
       </header>
-      <div class="panel-body">
-        <div class="code-box">
-          <span class="box-label">CÓDIGO DE SALA:</span>
-          <strong id="lobby-code-display">----</strong>
-        </div>
-        <div class="connected-box">
-          <div class="box-header-title">JUGADORES CONECTADOS (<span id="player-count">0</span>/4)</div>
-          <ul id="lobby-players-list"></ul>
+      <div class="card-body">
+        <div class="lobby-info">
+          <h3>JUGADORES EN MESA (<span id="player-count">0</span>/4)</h3>
+          <ul id="lobby-players-list" class="players-grid"></ul>
         </div>
         <div class="lobby-actions">
-          <button id="btn-start-game" class="btn btn-green" type="button" onclick="startGame()" style="display:none;">¡INICIAR PARTIDA!</button>
-          <p id="waiting-msg" class="info-text">ESPERANDO A QUE EL ANFITRIÓN INICIE...</p>
+          <button id="btn-start-game" class="btn btn-primary" onclick="startGame()" style="display:none;">¡INICIAR PARTIDA!</button>
+          <p id="waiting-msg" class="info-msg">Esperando a que el anfitrión inicie la mesa...</p>
         </div>
       </div>
     </div>
@@ -87,64 +102,67 @@
 
   <!-- PANTALLA 3: MESA DE JUEGO -->
   <main id="screen-game" class="screen">
-    <header class="hud-bar">
-      <div class="hud-pill">
-        <span class="pill-title">TURNO ACTUAL</span>
-        <span id="turn-display" class="pill-value">---</span>
+    <!-- BARRA HUD -->
+    <header class="game-hud">
+      <div class="hud-box">
+        <span class="hud-label">TURNO DE</span>
+        <strong id="turn-display" class="hud-val">---</strong>
       </div>
-      <div class="hud-pill">
-        <span class="pill-title">COLOR ACTIVO</span>
-        <div id="active-color-indicator" class="color-badge c-rojo">
-          <span id="active-color-text">ROJO</span>
-        </div>
+      <div class="hud-box">
+        <span class="hud-label">COLOR</span>
+        <div id="active-color-indicator" class="color-dot c-rojo"></div>
       </div>
-      <div class="hud-pill danger">
-        <span class="pill-title">ACUMULADO (+)</span>
-        <span id="stack-display" class="pill-value">+0</span>
+      <div class="hud-box danger">
+        <span class="hud-label">CASTIGO</span>
+        <strong id="stack-display" class="hud-val">+0</strong>
       </div>
-      <button class="btn btn-help" type="button" onclick="openHelpModal()">❓ GUÍA</button>
     </header>
 
-    <section id="opponents-zone" class="opponents-container"></section>
+    <!-- OPONENTES CON CARTAS BOCA ABAJO -->
+    <section id="opponents-zone" class="opponents-board"></section>
 
+    <!-- MESA CENTRAL -->
     <section class="table-center">
       <div class="deck-spot" onclick="drawCardCurrentPlayer()">
         <div class="unocard card-back">
-          <div class="diamond-frame"><span class="back-text">UNO</span></div>
+          <div class="card-inner">UNO</div>
         </div>
-        <span class="spot-label">ROBAR</span>
+        <span class="deck-label">ROBAR</span>
       </div>
+
       <div class="discard-spot">
         <div id="top-card" class="unocard c-rojo"></div>
-        <span class="spot-label">DESCARTE</span>
+        <span class="deck-label">DESCARTE</span>
       </div>
     </section>
 
+    <!-- DOCK Y MANO DEL JUGADOR -->
     <footer class="player-dock">
       <div class="dock-header">
         <span>TUS CARTAS (<span id="my-card-count">0</span>)</span>
-        <button class="btn-uno-action" type="button" onclick="sayUno()">¡GRITAR UNO!</button>
+        <button class="btn-uno" onclick="sayUno()">¡UNO!</button>
       </div>
       <div id="my-hand" class="cards-carousel"></div>
     </footer>
-  </main>
 
-  <!-- MODAL GUÍA -->
-  <div id="help-modal" class="modal-backdrop">
-    <div class="modal-box">
-      <header class="panel-header">
-        <h3 class="panel-title">GUÍA DE CARTAS</h3>
-        <p class="panel-subtitle">SISTEMA DE SUMAS</p>
-      </header>
-      <div class="help-content">
-        <div class="help-item">
-          <strong>Cartas (+2, +4 y +5):</strong>
-          <p>Acumulan castigo de robo directo. Si no tiras otra carta de suma compatible, robarás el total acumulado en la mesa.</p>
+    <!-- BURBUJA DE CHAT MENSENGER -->
+    <div id="chat-widget" class="chat-widget">
+      <button class="chat-toggle" onclick="toggleChat()">
+        💬 <span id="chat-badge" class="chat-badge">0</span>
+      </button>
+      <div id="chat-box" class="chat-box hidden">
+        <div class="chat-header">
+          <span>CHAT DE MESA</span>
+          <button onclick="toggleChat()" class="chat-close">✖</button>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="Escribe..." maxlength="80" onkeypress="handleChatKey(event)">
+          <button onclick="sendChatMessage()" class="btn-send">➤</button>
         </div>
       </div>
-      <button class="btn btn-red" type="button" onclick="closeHelpModal()">CERRAR</button>
     </div>
-  </div>
+  </main>
 
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
