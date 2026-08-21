@@ -1,12 +1,12 @@
 // SUSTITUYE ESTE BLOQUE CON LAS CREDENCIALES REALES DE TU PROYECTO DE FIREBASE:
 const firebaseConfig = {
-  apiKey: "AIzaSyDummyKeyForUnoClassicOnlineAppJS",
-  authDomain: "uno-classic-app.firebaseapp.com",
-  databaseURL: "https://uno-classic-app-default-rtdb.firebaseio.com",
-  projectId: "uno-classic-app",
-  storageBucket: "uno-classic-app.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:000000000000"
+  apiKey: "TU_API_KEY_REAL",
+  authDomain: "tu-proyecto.firebaseapp.com",
+  databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com",
+  projectId: "tu-proyecto",
+  storageBucket: "tu-proyecto.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef123456"
 };
 
 if (!firebase.apps.length) {
