@@ -2,184 +2,132 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNO Classic Online</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@600;900&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="./style.css?v=7.0">
-
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Firebase SDK versión 8 (Compatibilidad con el código JS) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
-  <div class="tabletop-bg">
-    <div class="felt-texture"></div>
-  </div>
-
-  <!-- PANTALLA MENU -->
+  <!-- PANTALLA PRINCIPAL / MENU -->
   <div id="screen-menu" class="screen active">
-    <div class="login-wrapper">
-
-      <div class="wood-card">
-        <div class="card-header amber">
-          <h2>Reglas del Juego</h2>
-          <span>UNO CLASSIC</span>
-        </div>
-        <div class="card-body scrollable">
-          <div class="rule-box">
-            <h4>Acumulación (+2, +4, +5)</h4>
-            <p>Si te tiran una carta de suma, puedes responder con otra para aumentar el castigo al siguiente jugador.</p>
-          </div>
-          <div class="rule-box">
-            <h4>Cartas Especiales</h4>
-            <p>Las cartas de color negro (★ y +4) te permiten cambiar el color activo del juego a tu elección.</p>
-          </div>
-          <div class="rule-box">
-            <h4>Cantar UNO</h4>
-            <p>Recuerda presionar el botón ¡UNO! cuando te quede una sola carta en la mano.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="wood-card">
-        <div class="card-header red">
-          <h1>UNO CLASSIC</h1>
-          <span>ONLINE MULTIPLAYER</span>
-        </div>
-        <div class="card-body">
-          <div class="input-group">
-            <label for="player-name-input">Tu Apodo</label>
-            <input type="text" id="player-name-input" placeholder="Ej: Pedro" maxlength="12">
-          </div>
-
-          <div class="actions-stack">
-            <button onclick="createRoom()" class="btn btn-primary">Crear Mesa</button>
-            <div class="divider"><span>O ÚNETE A UNA</span></div>
-            <div class="join-row">
-              <input type="text" id="room-code-input" placeholder="CÓDIGO" style="text-transform:uppercase;">
-              <button onclick="joinRoom()" class="btn btn-secondary">Unirse</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="wood-card">
-        <div class="card-header gold">
-          <h2>🏆 Ganadores</h2>
-          <span>ÚLTIMAS VICTORIAS</span>
-        </div>
-        <div class="card-body scrollable">
-          <ul id="winners-history-list" class="winners-list">
-            <li class="empty-msg">Cargando historial...</li>
-          </ul>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- PANTALLA LOBBY -->
-  <div id="screen-lobby" class="screen">
-    <div class="wood-card lobby-card">
-      <div class="card-header amber">
-        <h2>Mesa: <span id="lobby-code-display">----</span></h2>
-        <span>SALA DE ESPERA</span>
-      </div>
-      <div class="card-body">
-        <p>Jugadores conectados (<span id="player-count">0</span>):</p>
-        <ul id="lobby-players-list" class="players-grid"></ul>
-        <button id="btn-start-game" onclick="startGame()" class="btn btn-primary" style="display:none; width: 100%; margin-top: 10px;">Iniciar Juego</button>
-        <p id="waiting-msg" class="empty-msg" style="display:none; margin-top: 10px;">Esperando a que el anfitrión inicie la partida...</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- PANTALLA DE JUEGO CON PANELES LATERALES EN PC -->
-  <div id="screen-game" class="screen">
-    <div class="game-layout-wrapper">
+    <div class="menu-container">
       
-      <!-- PANEL IZQUIERDO PC -->
-      <aside class="side-panel left">
-        <div class="panel-box">
-          <h3>Estrategia</h3>
-          <p>Conserva tus cartas de cambio de color (+4 / ★) para situaciones críticas cuando la acumulación sea alta.</p>
+      <!-- Panel Izquierdo: Reglas -->
+      <div class="panel panel-rules">
+        <h2>Reglas del Juego</h2>
+        <p class="subtitle">UNO CLASSIC</p>
+        <div class="rule-box">
+          <h3>Acumulación (+2, +4, +5)</h3>
+          <p>Si te tiran una carta de suma, puedes responder con otra para aumentar el castigo al siguiente jugador.</p>
         </div>
-        <div class="panel-box">
-          <h3>Mesa de Juego</h3>
-          <p>Mesa multijugador sincronizada en tiempo real mediante base de datos.</p>
+        <div class="rule-box">
+          <h3>Cartas Especiales</h3>
+          <p>Las cartas de color negro (★ y +4) te permiten cambiar el color activo del juego a tu elección.</p>
         </div>
-      </aside>
+        <div class="rule-box">
+          <h3>Cantar UNO</h3>
+          <p>Recuerda presionar el botón ¡UNO! cuando te quede una sola carta en la mano.</p>
+        </div>
+      </div>
 
-      <!-- ÁREA CENTRAL DEL JUEGO -->
-      <main class="game-main-area">
-        <div class="game-hud">
-          <div class="hud-box">
-            <span class="hud-label">Turno</span>
-            <strong id="turn-display" class="hud-val">---</strong>
-          </div>
-          <div class="hud-box">
-            <span class="hud-label">Color Activo</span>
-            <div id="active-color-indicator" class="color-dot"></div>
-          </div>
-          <div class="hud-box danger">
-            <span class="hud-label">Acumulado</span>
-            <strong id="stack-display" class="hud-val">+0</strong>
-          </div>
+      <!-- Panel Central: Crear/Unirse -->
+      <div class="panel panel-main">
+        <div class="title-banner">
+          <h1>UNO CLASSIC</h1>
+          <p>ONLINE MULTIPLAYER</p>
+        </div>
+        
+        <div class="input-group">
+          <label>Tu Apodo</label>
+          <input type="text" id="player-name-input" placeholder="Introduce tu apodo..." maxlength="12">
         </div>
 
-        <div class="table-play-area">
-          <div id="opponents-zone" class="opponents-board"></div>
+        <button class="btn btn-red" onclick="createRoom()">CREAR MESA</button>
 
-          <div class="table-center">
-            <div class="deck-spot" onclick="drawCardCurrentPlayer()">
-              <div class="unocard card-back">
-                <div class="card-inner">UNO</div>
-              </div>
-              <span class="deck-label">Comer</span>
+        <div class="divider">O ÚNETE A UNA</div>
+
+        <div class="join-group">
+          <input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="6">
+          <button class="btn btn-yellow" onclick="joinRoom()">UNIRSE</button>
+        </div>
+      </div>
+
+      <!-- Panel Derecho: Ganadores -->
+      <div class="panel panel-winners">
+        <h2>🏆 Ganadores</h2>
+        <p class="subtitle">ÚLTIMAS VICTORIAS</p>
+        <ul id="winners-history-list" class="winners-list">
+          <li class="empty-msg">Cargando historial...</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PANTALLA SALA DE ESPERA (LOBBY) -->
+  <div id="screen-lobby" class="screen">
+    <div class="lobby-card">
+      <h2>SALA DE ESPERA</h2>
+      <p>CÓDIGO DE SALA: <strong id="lobby-code-display">------</strong></p>
+      
+      <div class="lobby-players">
+        <h3>Jugadores Conectados (<span id="player-count">0</span>):</h3>
+        <ul id="lobby-players-list"></ul>
+      </div>
+
+      <button id="btn-start-game" class="btn btn-red" onclick="startGame()" style="display:none;">INICIAR JUEGO</button>
+      <p id="waiting-msg" style="display:none;">Esperando que el anfitrión inicie la partida...</p>
+    </div>
+  </div>
+
+  <!-- PANTALLA DE JUEGO -->
+  <div id="screen-game" class="screen">
+    <div class="game-container">
+      
+      <!-- Zona Superior e Intermedia: Oponentes -->
+      <div id="opponents-zone" class="opponents-container"></div>
+
+      <!-- Zona Central: Mazo, Descarte y Estado -->
+      <div class="center-zone">
+        <div class="status-bar">
+          <div>Turno de: <span id="turn-display">---</span></div>
+          <div>Color: <span id="active-color-indicator" class="color-dot"></span></div>
+          <div>Acumulado: <span id="stack-display">+0</span></div>
+        </div>
+
+        <div class="table-center">
+          <div class="deck-spot" onclick="drawCardCurrentPlayer()">
+            <div class="unocard card-back">
+              <div class="card-inner">UNO</div>
             </div>
-
-            <div class="discard-spot">
-              <div id="top-card" class="unocard"></div>
-            </div>
+            <span>Robar</span>
           </div>
+
+          <div id="top-card" class="unocard"></div>
+        </div>
+      </div>
+
+      <!-- Zona Inferior: Mi Mano y Controles -->
+      <div class="bottom-zone">
+        <div class="controls-bar">
+          <button class="btn btn-uno" onclick="sayUno()">¡UNO!</button>
+          <button class="btn btn-chat" onclick="toggleChat()">💬 Chat <span id="chat-badge">0</span></button>
         </div>
 
-        <div class="player-dock">
-          <div class="dock-header">
-            <span>Tus cartas (<span id="my-card-count">0</span>)</span>
-            <button onclick="sayUno()" class="btn-uno">¡UNO!</button>
-          </div>
-          <div id="my-hand" class="cards-carousel"></div>
-        </div>
-      </main>
-
-      <!-- PANEL DERECHO PC -->
-      <aside class="side-panel right">
-        <div class="panel-box">
-          <h3>Estadísticas</h3>
-          <ul>
-            <li>Modo: Multijugador</li>
-            <li>Fondo: Verde Fieltro</li>
-            <li>Cartas: Tradicionales</li>
-          </ul>
-        </div>
-        <div class="panel-box">
-          <h3>Aviso</h3>
-          <p>El jugador que arroje su última carta ganará de inmediato la partida.</p>
-        </div>
-      </aside>
+        <div class="my-hand-title">Tu Mano (<span id="my-card-count">0</span> cartas)</div>
+        <div id="my-hand" class="hand-container"></div>
+      </div>
 
     </div>
 
-    <!-- MODAL ELECCIÓN DE COLOR -->
+    <!-- Modal Cambio de Color -->
     <div id="color-modal" class="modal hidden">
       <div class="modal-content">
-        <h3>Elige un nuevo color:</h3>
-        <div class="color-selector">
+        <h3>Elige un Color</h3>
+        <div class="color-buttons">
           <button class="btn-color c-rojo" onclick="selectColor('rojo')">Rojo</button>
           <button class="btn-color c-azul" onclick="selectColor('azul')">Azul</button>
           <button class="btn-color c-verde" onclick="selectColor('verde')">Verde</button>
@@ -188,26 +136,20 @@
       </div>
     </div>
 
-    <!-- CHAT EN TIEMPO REAL -->
-    <div id="chat-widget" class="chat-widget">
-      <button class="chat-toggle" onclick="toggleChat()">
-        💬 <span id="chat-badge" class="chat-badge">0</span>
-      </button>
-
-      <div id="chat-box" class="chat-box hidden">
-        <div class="chat-header">
-          <span>Chat de la Sala</span>
-          <button class="chat-close" onclick="toggleChat()">✕</button>
-        </div>
-        <div id="chat-messages" class="chat-messages"></div>
-        <div class="chat-input-row">
-          <input type="text" id="chat-input" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
-          <button class="btn-send" onclick="sendChatMessage()">Enviar</button>
-        </div>
+    <!-- Chat Flotante -->
+    <div id="chat-box" class="chat-container hidden">
+      <div class="chat-header">
+        <span>Chat de la Sala</span>
+        <button onclick="toggleChat()">✕</button>
+      </div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-input-area">
+        <input type="text" id="chat-input" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
+        <button onclick="sendChatMessage()">Enviar</button>
       </div>
     </div>
   </div>
 
-  <script src="./app.js?v=7.0"></script>
+  <script src="app.js"></script>
 </body>
 </html>
