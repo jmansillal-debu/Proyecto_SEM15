@@ -4,73 +4,144 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNO Classic Online</title>
-  <link rel="stylesheet" href="styles.css?v=4.0">
+  
+  <!-- Carga de Fuentes Google Fonts requeridas por CSS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@600;900&display=swap" rel="stylesheet">
+
+  <!-- Hoja de Estilos -->
+  <link rel="stylesheet" href="./styles.css?v=5.0">
+  
   <!-- Firebase SDK Compat -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
+  <!-- FONDO Y TEXTURA DE MESA -->
+  <div class="tabletop-bg">
+    <div class="felt-texture"></div>
+  </div>
+
   <!-- PANTALLA INICIAL / MENÚ -->
   <div id="screen-menu" class="screen active">
-    <h1>UNO CLASSIC</h1>
-    <div class="card-form">
-      <input type="text" id="player-name-input" placeholder="Tu Apodo" maxlength="12">
-      <button onclick="createRoom()" class="btn btn-primary">Crear Mesa</button>
+    <div class="login-wrapper">
       
-      <div class="divider"><span>O</span></div>
-      
-      <input type="text" id="room-code-input" placeholder="Código de Mesa" style="text-transform:uppercase;">
-      <button onclick="joinRoom()" class="btn btn-secondary">Unirse a Mesa</button>
-    </div>
+      <!-- REGLAS DE JUEGO -->
+      <div class="wood-card">
+        <div class="card-header amber">
+          <h2>Reglas del Juego</h2>
+          <span>UNO CLASSIC</span>
+        </div>
+        <div class="card-body scrollable">
+          <div class="rule-box">
+            <h4>Acumulación (+2, +4, +5)</h4>
+            <p>Si te tiran una carta de suma, puedes responder con otra para aumentar el castigo al siguiente jugador.</p>
+          </div>
+          <div class="rule-box">
+            <h4>Cartas Especiales</h4>
+            <p>Las cartas de color negro (★ y +4) te permiten cambiar el color activo del juego a tu elección.</p>
+          </div>
+          <div class="rule-box">
+            <h4>Cantar UNO</h4>
+            <p>Recuerda presionar el botón ¡UNO! cuando te quede una sola carta en la mano.</p>
+          </div>
+        </div>
+      </div>
 
-    <!-- HISTORIAL DE GANADORES -->
-    <div class="winners-box">
-      <h3>🏆 Últimos Ganadores</h3>
-      <ul id="winners-history-list">
-        <li class="empty-msg">Cargando historial...</li>
-      </ul>
+      <!-- MENÚ DE INGRESO -->
+      <div class="wood-card">
+        <div class="card-header red">
+          <h1>UNO CLASSIC</h1>
+          <span>ONLINE MULTIPLAYER</span>
+        </div>
+        <div class="card-body">
+          <div class="input-group">
+            <label for="player-name-input">Tu Apodo</label>
+            <input type="text" id="player-name-input" placeholder="Ej: Pedro" maxlength="12">
+          </div>
+          
+          <div class="actions-stack">
+            <button onclick="createRoom()" class="btn btn-primary">Crear Mesa</button>
+            <div class="divider"><span>O ÚNETE A UNA</span></div>
+            <div class="join-row">
+              <input type="text" id="room-code-input" placeholder="CÓDIGO" style="text-transform:uppercase;">
+              <button onclick="joinRoom()" class="btn btn-secondary">Unirse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORIAL DE GANADORES -->
+      <div class="wood-card">
+        <div class="card-header gold">
+          <h2>🏆 Ganadores</h2>
+          <span>ÚLTIMAS VICTORIAS</span>
+        </div>
+        <div class="card-body scrollable">
+          <ul id="winners-history-list" class="winners-list">
+            <li class="empty-msg">Cargando historial...</li>
+          </ul>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- PANTALLA LOBBY -->
   <div id="screen-lobby" class="screen">
-    <h2>Mesa: <span id="lobby-code-display">----</span></h2>
-    <p>Jugadores conectados (<span id="player-count">0</span>):</p>
-    <ul id="lobby-players-list"></ul>
-    
-    <button id="btn-start-game" onclick="startGame()" class="btn btn-primary" style="display:none;">Iniciar Juego</button>
-    <p id="waiting-msg" style="display:none;">Esperando a que el anfitrión inicie la partida...</p>
+    <div class="wood-card lobby-card">
+      <div class="card-header amber">
+        <h2>Mesa: <span id="lobby-code-display">----</span></h2>
+        <span>SALA DE ESPERA</span>
+      </div>
+      <div class="card-body">
+        <p>Jugadores conectados (<span id="player-count">0</span>):</p>
+        <ul id="lobby-players-list" class="players-grid"></ul>
+        <button id="btn-start-game" onclick="startGame()" class="btn btn-primary" style="display:none; width: 100%; margin-top: 10px;">Iniciar Juego</button>
+        <p id="waiting-msg" class="empty-msg" style="display:none; margin-top: 10px;">Esperando a que el anfitrión inicie la partida...</p>
+      </div>
+    </div>
   </div>
 
   <!-- PANTALLA DE JUEGO -->
   <div id="screen-game" class="screen">
-    <div class="game-header">
-      <div>Turno: <strong id="turn-display">---</strong></div>
-      <div>Color: <span id="active-color-indicator" class="color-dot"></span></div>
-      <div>Acumulado: <strong id="stack-display">+0</strong></div>
+    <div class="game-hud">
+      <div class="hud-box">
+        <span class="hud-label">Turno</span>
+        <strong id="turn-display" class="hud-val">---</strong>
+      </div>
+      <div class="hud-box">
+        <span class="hud-label">Color Activo</span>
+        <div id="active-color-indicator" class="color-dot"></div>
+      </div>
+      <div class="hud-box danger">
+        <span class="hud-label">Acumulado</span>
+        <strong id="stack-display" class="hud-val">+0</strong>
+      </div>
     </div>
 
     <!-- ZONA OPONENTES -->
-    <div id="opponents-zone" class="opponents-container"></div>
+    <div id="opponents-zone" class="opponents-board"></div>
 
     <!-- MESA CENTRAL -->
     <div class="table-center">
-      <div class="deck-pile" onclick="drawCardCurrentPlayer()">
+      <div class="deck-spot" onclick="drawCardCurrentPlayer()">
         <div class="unocard card-back">
           <div class="card-inner">UNO</div>
         </div>
-        <span>Comer</span>
+        <span class="deck-label">Comer</span>
       </div>
       
-      <div class="discard-pile">
+      <div class="discard-spot">
         <div id="top-card" class="unocard"></div>
       </div>
     </div>
 
     <!-- MANO Y CONTROLES DEL JUGADOR -->
-    <div class="player-zone">
-      <div class="player-info">
+    <div class="player-dock">
+      <div class="dock-header">
         <span>Tus cartas (<span id="my-card-count">0</span>)</span>
         <button onclick="sayUno()" class="btn-uno">¡UNO!</button>
       </div>
@@ -93,20 +164,23 @@
     <!-- FLOTANTE CHAT DE LA SALA -->
     <div id="chat-widget" class="chat-widget">
       <button class="chat-toggle" onclick="toggleChat()">
-        💬 Chat <span id="chat-badge" class="badge">0</span>
+        💬 <span id="chat-badge" class="chat-badge">0</span>
       </button>
       
       <div id="chat-box" class="chat-box hidden">
-        <div class="chat-header">Chat de la Sala</div>
+        <div class="chat-header">
+          <span>Chat de la Sala</span>
+          <button class="chat-close" onclick="toggleChat()">✕</button>
+        </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-row">
           <input type="text" id="chat-input" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
-          <button onclick="sendChatMessage()">Enviar</button>
+          <button class="btn-send" onclick="sendChatMessage()">Enviar</button>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="app.js?v=4.0"></script>
+  <script src="./app.js?v=5.0"></script>
 </body>
 </html>

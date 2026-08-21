@@ -27,7 +27,7 @@ html, body {
   max-height: 100vh;
   overflow: hidden;
   position: fixed;
-  font-family: var(--font-main);
+  font-family: var(--font-main), sans-serif;
   background: var(--felt-green);
   color: #fff;
 }
@@ -108,7 +108,7 @@ html, body {
 .card-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .card-body.scrollable { max-height: 380px; overflow-y: auto; }
 
-.rule-box { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border-left: 3px solid var(--gold); }
+.rule-box { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; border-left: 3px solid var(--gold); margin-bottom: 8px; }
 .rule-box h4 { font-size: 0.75rem; color: var(--gold); margin-bottom: 2px; }
 .rule-box p { font-size: 0.7rem; color: #d1d5db; line-height: 1.2; }
 
@@ -120,13 +120,13 @@ input[type="text"] {
   border: 2px solid var(--wood-light);
   border-radius: 6px;
   color: #fff;
-  font-family: var(--font-main);
+  font-family: var(--font-main), sans-serif;
   text-align: center;
   font-size: 0.95rem;
   outline: none;
 }
 
-.actions-stack { display: flex; flex-direction: flex-column; gap: 8px; display: flex; flex-direction: column; }
+.actions-stack { display: flex; flex-direction: column; gap: 8px; }
 .divider { text-align: center; font-size: 0.65rem; color: #9ca3af; margin: 4px 0; }
 .join-row { display: flex; gap: 6px; }
 
@@ -134,7 +134,7 @@ input[type="text"] {
   padding: 10px;
   border: none;
   border-radius: 6px;
-  font-family: var(--font-main);
+  font-family: var(--font-main), sans-serif;
   font-weight: 700;
   cursor: pointer;
   text-transform: uppercase;
@@ -171,6 +171,10 @@ input[type="text"] {
 .hud-val { font-size: 0.85rem; color: #fff; }
 .hud-box.danger .hud-val { color: var(--c-rojo); }
 .color-dot { width: 14px; height: 14px; border-radius: 50%; margin: 2px auto 0; border: 2px solid #fff; }
+.color-dot.c-rojo { background-color: var(--c-rojo); }
+.color-dot.c-azul { background-color: var(--c-azul); }
+.color-dot.c-verde { background-color: var(--c-verde); }
+.color-dot.c-amarillo { background-color: var(--c-amarillo); }
 
 /* OPONENTES CON CARTAS OCULTAS */
 .opponents-board { display: flex; justify-content: center; gap: 8px; z-index: 15; }
@@ -198,7 +202,8 @@ input[type="text"] {
   justify-content: space-between;
   user-select: none;
   flex-shrink: 0;
-  font-family: var(--font-cards);
+  font-family: var(--font-cards), sans-serif;
+  cursor: pointer;
 }
 
 .unocard.c-rojo { background: var(--c-rojo); }
@@ -221,6 +226,13 @@ input[type="text"] {
 .cards-carousel { display: flex; overflow-x: auto; gap: 6px; padding: 4px 2px; }
 .cards-carousel .unocard:hover { transform: translateY(-6px); }
 
+/* MODAL DE SELECCIÓN DE COLOR */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.modal.hidden { display: none; }
+.modal-content { background: var(--wood-dark); border: 3px solid var(--wood-light); padding: 20px; border-radius: 10px; text-align: center; }
+.color-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+.btn-color { padding: 12px; border: none; border-radius: 6px; font-weight: bold; color: #fff; cursor: pointer; }
+
 /* CHAT BURBUJA TIPO MESSENGER */
 .chat-widget { position: fixed; bottom: 85px; right: 12px; z-index: 90; }
 .chat-toggle { background: var(--c-azul); border: 2px solid #fff; border-radius: 50%; width: 48px; height: 48px; font-size: 1.2rem; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); position: relative; }
@@ -234,5 +246,5 @@ input[type="text"] {
 .chat-msg { background: rgba(255,255,255,0.08); padding: 6px 8px; border-radius: 6px; font-size: 0.7rem; line-height: 1.2; }
 .chat-msg strong { color: var(--gold); display: block; font-size: 0.65rem; }
 .chat-input-row { display: flex; border-top: 1px solid var(--wood-light); }
-.chat-input-row input { border: none; border-radius: 0; background: rgba(0,0,0,0.3); text-align: left; padding: 8px; font-size: 0.75rem; }
-.btn-send { background: var(--c-azul); border: none; color: #fff; padding: 0 12px; cursor: pointer; }
+.chat-input-row input { border: none; border-radius: 0; background: rgba(0,0,0,0.3); text-align: left; padding: 8px; font-size: 0.75rem; flex: 1; }
+.btn-send { background: var(--c-azul); border: none; color: #fff; padding: 0 12px; cursor: pointer; font-weight: bold; }
