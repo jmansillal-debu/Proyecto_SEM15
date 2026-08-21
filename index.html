@@ -5,30 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNO Classic Online</title>
 
-  <!-- Fuentes de Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@600;900&display=swap" rel="stylesheet">
 
-  <!-- Estilos -->
-  <link rel="stylesheet" href="./style.css?v=6.0">
+  <link rel="stylesheet" href="./style.css?v=7.0">
 
-  <!-- Firebase SDK Compat -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
-  <!-- FONDO Y TEXTURA DE MESA -->
   <div class="tabletop-bg">
     <div class="felt-texture"></div>
   </div>
 
-  <!-- PANTALLA INICIAL / MENÚ PRINCIPAL -->
+  <!-- PANTALLA MENU -->
   <div id="screen-menu" class="screen active">
     <div class="login-wrapper">
 
-      <!-- CONTENEDOR 1: REGLAS DEL JUEGO -->
       <div class="wood-card">
         <div class="card-header amber">
           <h2>Reglas del Juego</h2>
@@ -50,7 +45,6 @@
         </div>
       </div>
 
-      <!-- CONTENEDOR 2: LOGIN Y UNIÓN -->
       <div class="wood-card">
         <div class="card-header red">
           <h1>UNO CLASSIC</h1>
@@ -73,7 +67,6 @@
         </div>
       </div>
 
-      <!-- CONTENEDOR 3: HISTORIAL DE GANADORES -->
       <div class="wood-card">
         <div class="card-header gold">
           <h2>🏆 Ganadores</h2>
@@ -105,48 +98,81 @@
     </div>
   </div>
 
-  <!-- PANTALLA DE JUEGO -->
+  <!-- PANTALLA DE JUEGO CON PANELES LATERALES EN PC -->
   <div id="screen-game" class="screen">
-    <div class="game-hud">
-      <div class="hud-box">
-        <span class="hud-label">Turno</span>
-        <strong id="turn-display" class="hud-val">---</strong>
-      </div>
-      <div class="hud-box">
-        <span class="hud-label">Color Activo</span>
-        <div id="active-color-indicator" class="color-dot"></div>
-      </div>
-      <div class="hud-box danger">
-        <span class="hud-label">Acumulado</span>
-        <strong id="stack-display" class="hud-val">+0</strong>
-      </div>
-    </div>
+    <div class="game-layout-wrapper">
+      
+      <!-- PANEL IZQUIERDO PC -->
+      <aside class="side-panel left">
+        <div class="panel-box">
+          <h3>Estrategia</h3>
+          <p>Conserva tus cartas de cambio de color (+4 / ★) para situaciones críticas cuando la acumulación sea alta.</p>
+        </div>
+        <div class="panel-box">
+          <h3>Mesa de Juego</h3>
+          <p>Mesa multijugador sincronizada en tiempo real mediante base de datos.</p>
+        </div>
+      </aside>
 
-    <!-- ÁREA PRINCIPAL DE LA MESA CON OPONENTES DISTRIBUIDOS -->
-    <div class="table-play-area">
-      <div id="opponents-zone" class="opponents-board"></div>
-
-      <div class="table-center">
-        <div class="deck-spot" onclick="drawCardCurrentPlayer()">
-          <div class="unocard card-back">
-            <div class="card-inner">UNO</div>
+      <!-- ÁREA CENTRAL DEL JUEGO -->
+      <main class="game-main-area">
+        <div class="game-hud">
+          <div class="hud-box">
+            <span class="hud-label">Turno</span>
+            <strong id="turn-display" class="hud-val">---</strong>
           </div>
-          <span class="deck-label">Comer</span>
+          <div class="hud-box">
+            <span class="hud-label">Color Activo</span>
+            <div id="active-color-indicator" class="color-dot"></div>
+          </div>
+          <div class="hud-box danger">
+            <span class="hud-label">Acumulado</span>
+            <strong id="stack-display" class="hud-val">+0</strong>
+          </div>
         </div>
 
-        <div class="discard-spot">
-          <div id="top-card" class="unocard"></div>
-        </div>
-      </div>
-    </div>
+        <div class="table-play-area">
+          <div id="opponents-zone" class="opponents-board"></div>
 
-    <!-- DOCK Y MANO DEL JUGADOR -->
-    <div class="player-dock">
-      <div class="dock-header">
-        <span>Tus cartas (<span id="my-card-count">0</span>)</span>
-        <button onclick="sayUno()" class="btn-uno">¡UNO!</button>
-      </div>
-      <div id="my-hand" class="cards-carousel"></div>
+          <div class="table-center">
+            <div class="deck-spot" onclick="drawCardCurrentPlayer()">
+              <div class="unocard card-back">
+                <div class="card-inner">UNO</div>
+              </div>
+              <span class="deck-label">Comer</span>
+            </div>
+
+            <div class="discard-spot">
+              <div id="top-card" class="unocard"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="player-dock">
+          <div class="dock-header">
+            <span>Tus cartas (<span id="my-card-count">0</span>)</span>
+            <button onclick="sayUno()" class="btn-uno">¡UNO!</button>
+          </div>
+          <div id="my-hand" class="cards-carousel"></div>
+        </div>
+      </main>
+
+      <!-- PANEL DERECHO PC -->
+      <aside class="side-panel right">
+        <div class="panel-box">
+          <h3>Estadísticas</h3>
+          <ul>
+            <li>Modo: Multijugador</li>
+            <li>Fondo: Verde Fieltro</li>
+            <li>Cartas: Tradicionales</li>
+          </ul>
+        </div>
+        <div class="panel-box">
+          <h3>Aviso</h3>
+          <p>El jugador que arroje su última carta ganará de inmediato la partida.</p>
+        </div>
+      </aside>
+
     </div>
 
     <!-- MODAL ELECCIÓN DE COLOR -->
@@ -182,6 +208,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=6.0"></script>
+  <script src="./app.js?v=7.0"></script>
 </body>
 </html>

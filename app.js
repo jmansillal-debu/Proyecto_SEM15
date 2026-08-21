@@ -11,6 +11,7 @@ const firebaseConfig = {
 
 let db = null;
 let chatListenerRef = null;
+let gameFinishedAlerted = false;
 
 function initializeDatabase() {
   try {
@@ -38,7 +39,6 @@ function showScreen(screenId) {
   if (target) target.classList.add('active');
 }
 
-/* HISTORIAL DE GANADORES */
 function listenToGlobalWinners() {
   if (!db) return;
   db.ref('winners_history').limitToLast(8).on('value', snapshot => {
@@ -67,7 +67,6 @@ function registerWinner(winnerName) {
   });
 }
 
-/* CREAR Y UNIRSE A SALA */
 function createRoom() {
   const name = document.getElementById('player-name-input').value.trim();
   if (!name) return alert("Ingresa tu apodo.");
@@ -76,6 +75,7 @@ function createRoom() {
   localState.playerId = 'p_' + Math.random().toString(36).substring(2, 7);
   localState.roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
   localState.isHost = true;
+  gameFinishedAlerted = false;
 
   db.ref('rooms/' + localState.roomCode).set({
     status: 'LOBBY',
@@ -101,6 +101,7 @@ function joinRoom() {
   localState.playerName = name;
   localState.playerId = 'p_' + Math.random().toString(36).substring(2, 7);
   localState.roomCode = code;
+  gameFinishedAlerted = false;
 
   db.ref(`rooms/${code}`).once('value', snapshot => {
     if (!snapshot.exists()) return alert("Mesa no encontrada.");
@@ -115,10 +116,8 @@ function joinRoom() {
   });
 }
 
-/* CHAT EN TIEMPO REAL */
 function listenToChat() {
   if (!db || !localState.roomCode) return;
-
   if (chatListenerRef) chatListenerRef.off();
 
   const chatContainer = document.getElementById('chat-messages');
@@ -140,9 +139,8 @@ function sendChatMessage() {
     sender: localState.playerName || 'Jugador',
     text: text,
     timestamp: Date.now()
-  }).then(() => {
-    input.value = '';
-  }).catch(err => alert("Error enviando mensaje: " + err.message));
+  });
+  input.value = '';
 }
 
 function handleChatKey(e) {
@@ -178,7 +176,6 @@ function toggleChat() {
   }
 }
 
-/* GENERACIÓN DE BARAJA */
 function generateDeck() {
   const colors = ['rojo', 'azul', 'verde', 'amarillo'];
   const deck = [];
@@ -245,7 +242,7 @@ function listenToRoom() {
       document.getElementById('lobby-players-list').innerHTML = players.map(p => `<li>${p.name}</li>`).join('');
       document.getElementById('btn-start-game').style.display = localState.isHost ? 'block' : 'none';
       document.getElementById('waiting-msg').style.display = localState.isHost ? 'none' : 'block';
-    } else if (data.status === 'PLAYING') {
+    } else if (data.status === 'PLAYING' || data.status === 'FINISHED') {
       showScreen('screen-game');
       renderGameTable(data);
     }
@@ -272,7 +269,7 @@ function renderGameTable(data) {
   topEl.className = `unocard c-${data.topCard.color}`;
   topEl.innerHTML = createCardHTML(data.topCard);
 
-  /* RENDERIZADO DE OPONENTES ALREDEDOR DE LA MESA */
+  /* DIBUJO DE OPONENTES SIN CONTENEDOR DE CAJA */
   const oppZone = document.getElementById('opponents-zone');
   oppZone.innerHTML = '';
   
@@ -293,7 +290,8 @@ function renderGameTable(data) {
     }
 
     let backCardsHTML = '';
-    for (let i = 0; i < Math.min(handCount, 5); i++) {
+    const visibleCards = Math.min(handCount, 6);
+    for (let i = 0; i < visibleCards; i++) {
       backCardsHTML += '<div class="mini-card-back"></div>';
     }
 
@@ -306,7 +304,7 @@ function renderGameTable(data) {
     oppZone.appendChild(cardBox);
   });
 
-  /* RENDERIZADO DE MI MANO CON SCROLL Y SOLAPAMIENTO */
+  /* RENDERIZADO DE MI MANO */
   const myHand = data.players[localState.playerId]?.hand || [];
   document.getElementById('my-card-count').textContent = myHand.length;
 
@@ -317,20 +315,38 @@ function renderGameTable(data) {
     const cardEl = document.createElement('div');
     cardEl.className = `unocard c-${card.color}`;
     cardEl.innerHTML = createCardHTML(card);
-    cardEl.onclick = () => playCard(index, card, data);
+    cardEl.onclick = () => {
+      if (data.status === 'PLAYING') playCard(index, card, data);
+    };
     carousel.appendChild(cardEl);
   });
 
-  /* COMPROBAR GANADOR */
+  /* COMPROBACIÓN Y FINALIZACIÓN DE JUEGO (0 CARTAS) */
   playerOrder.forEach(id => {
-    if (data.players[id].hand && data.players[id].hand.length === 0) {
-      alert(`¡${data.players[id].name} ha ganado la partida!`);
-      if (localState.isHost) registerWinner(data.players[id].name);
+    const pHand = data.players[id].hand || [];
+    if (pHand.length === 0 && data.status === 'PLAYING') {
+      const winnerName = data.players[id].name;
+
+      if (localState.isHost) {
+        registerWinner(winnerName);
+        db.ref('rooms/' + localState.roomCode).update({
+          status: 'FINISHED',
+          winner: winnerName
+        });
+      }
     }
   });
+
+  if (data.status === 'FINISHED' && !gameFinishedAlerted) {
+    gameFinishedAlerted = true;
+    setTimeout(() => {
+      alert(`🎉 ¡EL JUEGO HA TERMINADO! EL GANADOR ES: ${data.winner}`);
+    }, 100);
+  }
 }
 
 function playCard(handIndex, card, roomData) {
+  if (roomData.status !== 'PLAYING') return alert("El juego ha terminado.");
   if (roomData.playerOrder[roomData.turnIndex] !== localState.playerId) {
     return alert("No es tu turno.");
   }
@@ -388,6 +404,7 @@ function drawCardCurrentPlayer() {
 
   roomRef.once('value', snapshot => {
     const data = snapshot.val();
+    if (data.status !== 'PLAYING') return alert("El juego ha terminado.");
     if (data.playerOrder[data.turnIndex] !== localState.playerId) return alert("No es tu turno.");
 
     let myHand = data.players[localState.playerId].hand || [];
