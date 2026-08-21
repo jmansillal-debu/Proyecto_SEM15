@@ -1,12 +1,12 @@
-// Configuración de Firebase (Sustituye con tus credenciales si usas un proyecto propio)
+// SUSTITUYE ESTOS VALORES CON LOS DE TU CONSOLA DE FIREBASE:
 const firebaseConfig = {
-  apiKey: "AIzaSyDummyKeyForUnoClassicOnlineAppJS",
-  authDomain: "uno-classic-app.firebaseapp.com",
-  databaseURL: "https://uno-classic-app-default-rtdb.firebaseio.com",
-  projectId: "uno-classic-app",
-  storageBucket: "uno-classic-app.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:000000000000"
+  apiKey: "TU_API_KEY_REAL",
+  authDomain: "tu-proyecto.firebaseapp.com",
+  databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com",
+  projectId: "tu-proyecto",
+  storageBucket: "tu-proyecto.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef123456"
 };
 
 if (!firebase.apps.length) {
@@ -70,12 +70,15 @@ function createRoom() {
     }
   };
 
-  roomRef.set(initialRoomData, (err) => {
-    if (!err) {
+  roomRef.set(initialRoomData)
+    .then(() => {
       listenToRoom();
       showScreen('screen-lobby');
-    }
-  });
+    })
+    .catch((err) => {
+      console.error("Error al crear sala:", err);
+      alert("Error de conexión con la base de datos: " + err.message);
+    });
 }
 
 function joinRoom() {
@@ -123,13 +126,11 @@ function generateDeck() {
     });
   });
 
-  // Cartas Especiales (Negras)
   for (let i = 0; i < 4; i++) {
     deck.push({ color: 'negro', value: '★', id: Math.random().toString(36).substr(2, 9) });
     deck.push({ color: 'negro', value: '+4', id: Math.random().toString(36).substr(2, 9) });
   }
 
-  // Mezclar
   return deck.sort(() => Math.random() - 0.5);
 }
 
@@ -142,19 +143,24 @@ function listenToRoom() {
     updateUI();
   });
 
-  // Escuchar chat
   chatRef = db.ref('chats/' + currentRoomCode);
   chatRef.on('value', snapshot => {
     if (!snapshot.exists()) return;
     renderChat(snapshot.val());
   });
-
-  // Cargar Historial de Ganadores
-  db.ref('winners').limitToLast(5).on('value', snapshot => {
-    if (!snapshot.exists()) return;
-    renderWinners(snapshot.val());
-  });
 }
+
+// Cargar Historial Global de Ganadores al iniciar
+db.ref('winners').limitToLast(5).on('value', snapshot => {
+  const list = document.getElementById('winners-history-list');
+  if (!snapshot.exists()) {
+    list.innerHTML = '<li class="empty-msg">No hay victorias registradas aún.</li>';
+    return;
+  }
+  renderWinners(snapshot.val());
+}, (err) => {
+  console.error("Error al cargar ganadores:", err);
+});
 
 function startGame() {
   if (!currentGameState || currentGameState.host !== myPlayerId) return;
@@ -168,12 +174,10 @@ function startGame() {
   let deck = [...currentGameState.deck];
   let players = { ...currentGameState.players };
 
-  // Repartir 7 cartas a cada uno
   playerKeys.forEach(pId => {
     players[pId].hand = deck.splice(0, 7);
   });
 
-  // Obtener primera carta válida (no especial negra)
   let topCard = deck.pop();
   while (topCard.color === 'negro') {
     deck.unshift(topCard);
@@ -191,7 +195,6 @@ function startGame() {
   });
 }
 
-// ACTUALIZACIÓN DE INTERFAZ (UI)
 function updateUI() {
   if (currentGameState.status === 'waiting') {
     showScreen('screen-lobby');
@@ -227,7 +230,6 @@ function renderGameBoard() {
 
   document.getElementById('stack-display').innerText = '+' + (currentGameState.stack || 0);
 
-  // Carta centro (Descarte)
   const topCardSpot = document.getElementById('top-card');
   if (currentGameState.topCard) {
     topCardSpot.className = `unocard c-${currentGameState.topCard.color}`;
@@ -238,10 +240,7 @@ function renderGameBoard() {
     `;
   }
 
-  // Oponentes
   renderOpponents(turnPlayerId);
-
-  // Mi mano
   renderMyHand(isMyTurn);
 }
 
@@ -298,7 +297,6 @@ function renderMyHand(isMyTurn) {
   });
 }
 
-// JUGAR CARTA Y REGLAS DE TURNO
 function playCard(card) {
   const top = currentGameState.topCard;
   const activeColor = currentGameState.activeColor;
@@ -306,13 +304,11 @@ function playCard(card) {
 
   let isValid = false;
 
-  // Lógica con acumulaciones activas
   if (stack > 0) {
     if (card.value === '+2' || card.value === '+4') {
       isValid = true;
     }
   } else {
-    // Lógica standard de jugada
     if (card.color === 'negro' || card.color === activeColor || card.value === top.value) {
       isValid = true;
     }
@@ -344,7 +340,6 @@ function executeMove(card, chosenColor) {
   if (card.value === '+2') newStack += 2;
   if (card.value === '+4') newStack += 4;
 
-  // Comprobar Victoria
   if (myHand.length === 0) {
     db.ref('winners').push({
       name: myPlayerName,
@@ -356,7 +351,6 @@ function executeMove(card, chosenColor) {
     return;
   }
 
-  // Siguiente Turno
   let nextIndex = currentGameState.currentTurnIndex;
   let step = card.value === '🔄' ? -1 : 1;
   
@@ -391,7 +385,6 @@ function drawCardCurrentPlayer() {
   let myHand = [...(currentGameState.players[myPlayerId].hand || [])];
   let stack = currentGameState.stack || 0;
 
-  // Si no hay cartas suficientes en el mazo
   if (deck.length < Math.max(1, stack)) {
     deck = generateDeck();
   }
@@ -425,7 +418,6 @@ function sayUno() {
   }
 }
 
-// SISTEMA DE CHAT
 function toggleChat() {
   const chatBox = document.getElementById('chat-box');
   chatBox.classList.toggle('hidden');
