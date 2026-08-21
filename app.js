@@ -12,7 +12,6 @@ const firebaseConfig = {
 let db = null;
 let isFirebaseConnected = false;
 
-// Intentar inicializar Firebase
 try {
   if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "TU_API_KEY_REAL") {
     if (!firebase.apps.length) {
@@ -22,7 +21,7 @@ try {
     isFirebaseConnected = true;
   }
 } catch (e) {
-  console.warn("Firebase no está configurado correctamente. Usando modo de prueba local.", e);
+  console.warn("Modo local activado.", e);
 }
 
 // Estado global del cliente
@@ -37,7 +36,20 @@ let pendingWildCard = null;
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '🚫', '🔄'];
 
-// NAVEGACIÓN Y MENÚS
+// Mascotas y Jerga Peruana
+const PET_AVATARS = ['🦙', '🦫', '🦜', '🦝'];
+let currentPetIndex = 0;
+const PERU_PHRASES = [
+  "¡Habla causa!",
+  "¡Paga tu +4 pues!",
+  "¡Oe, no seas fino!",
+  "¡Asu mare, qué buena carta!",
+  "¡Ya fuiste mano!",
+  "¡Canta UNO o te caigo!",
+  "¡Aguanta ahí, pe!",
+  "¡No me florees!"
+];
+
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(screenId);
@@ -70,6 +82,7 @@ function createRoom() {
     turnOrder: [myPlayerId],
     topCard: null,
     deck: generateDeck(),
+    winnerName: null,
     players: {
       [myPlayerId]: {
         id: myPlayerId,
@@ -88,13 +101,8 @@ function createRoom() {
         listenToRoom();
         showScreen('screen-lobby');
       })
-      .catch(err => {
-        console.error("Error al crear la sala en Firebase:", err);
-        alert("Error de conexión con Firebase. Iniciando en modo local.");
-        startLocalRoom(initialRoomData);
-      });
+      .catch(() => startLocalRoom(initialRoomData));
   } else {
-    // Modo Local
     startLocalRoom(initialRoomData);
   }
 }
@@ -126,7 +134,7 @@ function joinRoom() {
       }
       const data = snapshot.val();
       if (data.status !== 'waiting') {
-        alert('La partida ya ha comenzado o ha finalizado.');
+        alert('La partida ya inició.');
         return;
       }
 
@@ -139,16 +147,13 @@ function joinRoom() {
       }).then(() => {
         listenToRoom();
         showScreen('screen-lobby');
-      }).catch(err => {
-        alert("Error al unirse a la sala: " + err.message);
       });
     });
   } else {
-    alert('Modo local: Para jugar multijugador entre varios dispositivos, debes ingresar tu API Key de Firebase en app.js.');
+    alert('Se requiere conexión Firebase activa para unirse a salas remotas.');
   }
 }
 
-// LÓGICA DE BARAJA Y JUEGO
 function generateDeck() {
   let deck = [];
   COLORS.forEach(color => {
@@ -158,13 +163,11 @@ function generateDeck() {
     });
   });
 
-  // Cartas Especiales (Negras)
   for (let i = 0; i < 4; i++) {
     deck.push({ color: 'negro', value: '★', id: Math.random().toString(36).substr(2, 9) });
     deck.push({ color: 'negro', value: '+4', id: Math.random().toString(36).substr(2, 9) });
   }
 
-  // Mezclar
   return deck.sort(() => Math.random() - 0.5);
 }
 
@@ -182,38 +185,35 @@ function listenToRoom() {
 
   if (isFirebaseConnected && db) {
     chatRef = db.ref('chats/' + currentRoomCode);
-    chatRef.on('value', snapshot => {
-      if (!snapshot.exists()) return;
-      renderChat(snapshot.val());
+    chatRef.on('child_added', snapshot => {
+      if (snapshot.exists()) {
+        renderL4DMessage(snapshot.val());
+      }
     });
   }
 }
 
-// Cargar Historial de Ganadores al iniciar
+// CARGAR HISTORIAL CON GANADOR Y JUGADORES
 if (isFirebaseConnected && db) {
   db.ref('winners').limitToLast(5).on('value', snapshot => {
-    const list = document.getElementById('winners-history-list');
     if (!snapshot.exists()) {
-      if (list) list.innerHTML = '<li style="padding:10px; opacity:0.6;">Sin victorias aún</li>';
+      setFallbackWinners();
       return;
     }
     renderWinners(snapshot.val());
-  }, err => {
-    console.error("Error al cargar historial:", err);
-    setFallbackWinners();
   });
 } else {
-  window.addEventListener('DOMContentLoaded', () => {
-    setFallbackWinners();
-  });
+  window.addEventListener('DOMContentLoaded', () => setFallbackWinners());
 }
 
 function setFallbackWinners() {
   const list = document.getElementById('winners-history-list');
   if (list) {
     list.innerHTML = `
-      <li class="winner-item"><span>Demo Player</span> <span>12:00</span></li>
-      <li class="winner-item"><span>Mesa Lista</span> <span>Local</span></li>
+      <li class="winner-item">
+        <div class="winner-header"><span>🏆 Fernando</span> <span>12:00</span></div>
+        <div class="winner-players">Jugadores: Fernando, Carlos, Ana</div>
+      </li>
     `;
   }
 }
@@ -243,7 +243,8 @@ function startGame() {
     topCard: topCard,
     activeColor: topCard ? topCard.color : 'rojo',
     turnOrder: playerKeys,
-    currentTurnIndex: 0
+    currentTurnIndex: 0,
+    winnerName: null
   };
 
   currentGameState = updatedState;
@@ -259,29 +260,31 @@ function updateUI() {
   if (!currentGameState) return;
 
   if (currentGameState.status === 'waiting') {
+    document.getElementById('winner-modal')?.classList.add('hidden');
     showScreen('screen-lobby');
     const playersArr = Object.values(currentGameState.players || {});
-    const pCount = document.getElementById('player-count');
-    if (pCount) pCount.innerText = playersArr.length;
-
-    const list = document.getElementById('lobby-players-list');
-    if (list) {
-      list.innerHTML = playersArr.map(p => `<li>${p.name} ${p.isHost ? '👑' : ''}</li>`).join('');
-    }
+    
+    document.getElementById('player-count').innerText = playersArr.length;
+    document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `<li>${p.name} ${p.isHost ? '👑' : ''}</li>`).join('');
 
     const btnStart = document.getElementById('btn-start-game');
     const msgWait = document.getElementById('waiting-msg');
 
     if (currentGameState.host === myPlayerId) {
-      if (btnStart) btnStart.style.display = 'block';
-      if (msgWait) msgWait.style.display = 'none';
+      btnStart.style.display = 'block';
+      msgWait.style.display = 'none';
     } else {
-      if (btnStart) btnStart.style.display = 'none';
-      if (msgWait) msgWait.style.display = 'block';
+      btnStart.style.display = 'none';
+      msgWait.style.display = 'block';
     }
   } else if (currentGameState.status === 'playing') {
     showScreen('screen-game');
     renderGameBoard();
+  } else if (currentGameState.status === 'ended') {
+    showScreen('screen-game');
+    const modal = document.getElementById('winner-modal');
+    document.getElementById('winner-name-display').innerText = currentGameState.winnerName || "---";
+    modal.classList.remove('hidden');
   }
 }
 
@@ -296,11 +299,8 @@ function renderGameBoard() {
     turnDisp.style.color = isMyTurn ? '#ffb300' : '#fff';
   }
 
-  const colorInd = document.getElementById('active-color-indicator');
-  if (colorInd) colorInd.className = 'color-dot c-' + currentGameState.activeColor;
-
-  const stackDisp = document.getElementById('stack-display');
-  if (stackDisp) stackDisp.innerText = '+' + (currentGameState.stack || 0);
+  document.getElementById('active-color-indicator').className = 'color-dot c-' + currentGameState.activeColor;
+  document.getElementById('stack-display').innerText = '+' + (currentGameState.stack || 0);
 
   const topCardSpot = document.getElementById('top-card');
   if (topCardSpot && currentGameState.topCard) {
@@ -352,8 +352,7 @@ function renderMyHand(isMyTurn) {
   const myData = currentGameState.players[myPlayerId];
   if (!myData || !myData.hand) return;
 
-  const cardCountElem = document.getElementById('my-card-count');
-  if (cardCountElem) cardCountElem.innerText = myData.hand.length;
+  document.getElementById('my-card-count').innerText = myData.hand.length;
 
   myData.hand.forEach((card) => {
     const cardEl = document.createElement('div');
@@ -380,29 +379,23 @@ function playCard(card) {
   let isValid = false;
 
   if (stack > 0) {
-    if (card.value === '+2' || card.value === '+4') {
-      isValid = true;
-    }
+    if (card.value === '+2' || card.value === '+4') isValid = true;
   } else {
-    if (card.color === 'negro' || card.color === activeColor || card.value === top.value) {
-      isValid = true;
-    }
+    if (card.color === 'negro' || card.color === activeColor || card.value === top.value) isValid = true;
   }
 
   if (!isValid) return;
 
   if (card.color === 'negro') {
     pendingWildCard = card;
-    const modal = document.getElementById('color-modal');
-    if (modal) modal.classList.remove('hidden');
+    document.getElementById('color-modal')?.classList.remove('hidden');
   } else {
     executeMove(card, card.color);
   }
 }
 
 function selectColor(color) {
-  const modal = document.getElementById('color-modal');
-  if (modal) modal.classList.add('hidden');
+  document.getElementById('color-modal')?.classList.add('hidden');
   if (pendingWildCard) {
     executeMove(pendingWildCard, color);
     pendingWildCard = null;
@@ -417,16 +410,28 @@ function executeMove(card, chosenColor) {
   if (card.value === '+2') newStack += 2;
   if (card.value === '+4') newStack += 4;
 
+  triggerPetInteraction();
+
+  // VERIFICAR GANADOR
   if (myHand.length === 0) {
-    if (roomRef) {
+    const allPlayerNames = Object.values(currentGameState.players).map(p => p.name).join(', ');
+
+    if (isFirebaseConnected && db) {
       db.ref('winners').push({
-        name: myPlayerName,
+        winner: myPlayerName,
+        players: allPlayerNames,
         date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
-      roomRef.update({ status: 'waiting' });
+
+      roomRef.update({
+        status: 'ended',
+        winnerName: myPlayerName
+      });
+    } else {
+      currentGameState.status = 'ended';
+      currentGameState.winnerName = myPlayerName;
+      updateUI();
     }
-    alert('¡HAS GANADO LA PARTIDA!');
-    showScreen('screen-menu');
     return;
   }
 
@@ -439,12 +444,6 @@ function executeMove(card, chosenColor) {
     nextIndex = getNextTurnIndex(nextIndex, step);
   }
 
-  currentGameState.players[myPlayerId].hand = myHand;
-  currentGameState.topCard = card;
-  currentGameState.activeColor = chosenColor;
-  currentGameState.stack = newStack;
-  currentGameState.currentTurnIndex = nextIndex;
-
   if (roomRef) {
     const updates = {};
     updates[`players/${myPlayerId}/hand`] = myHand;
@@ -454,6 +453,11 @@ function executeMove(card, chosenColor) {
     updates['currentTurnIndex'] = nextIndex;
     roomRef.update(updates);
   } else {
+    currentGameState.players[myPlayerId].hand = myHand;
+    currentGameState.topCard = card;
+    currentGameState.activeColor = chosenColor;
+    currentGameState.stack = newStack;
+    currentGameState.currentTurnIndex = nextIndex;
     updateUI();
   }
 }
@@ -473,23 +477,14 @@ function drawCardCurrentPlayer() {
   let myHand = [...(currentGameState.players[myPlayerId].hand || [])];
   let stack = currentGameState.stack || 0;
 
-  if (deck.length < Math.max(1, stack)) {
-    deck = generateDeck();
-  }
+  if (deck.length < Math.max(1, stack)) deck = generateDeck();
 
   const drawCount = stack > 0 ? stack : 1;
   for (let i = 0; i < drawCount; i++) {
-    if (deck.length > 0) {
-      myHand.push(deck.pop());
-    }
+    if (deck.length > 0) myHand.push(deck.pop());
   }
 
   const nextIndex = getNextTurnIndex(currentGameState.currentTurnIndex, 1);
-
-  currentGameState.deck = deck;
-  currentGameState.stack = 0;
-  currentGameState.players[myPlayerId].hand = myHand;
-  currentGameState.currentTurnIndex = nextIndex;
 
   if (roomRef) {
     roomRef.update({
@@ -499,6 +494,10 @@ function drawCardCurrentPlayer() {
       currentTurnIndex: nextIndex
     });
   } else {
+    currentGameState.deck = deck;
+    currentGameState.stack = 0;
+    currentGameState.players[myPlayerId].hand = myHand;
+    currentGameState.currentTurnIndex = nextIndex;
     updateUI();
   }
 }
@@ -506,73 +505,89 @@ function drawCardCurrentPlayer() {
 function sayUno() {
   const myHand = currentGameState.players[myPlayerId]?.hand || [];
   if (myHand.length === 1) {
-    if (chatRef) {
-      chatRef.push({
-        sender: 'SISTEMA',
-        text: `¡${myPlayerName} ha cantado ¡UNO!!`
-      });
-    } else {
-      alert('¡Has cantado UNO!');
-    }
+    sendL4DMessage(`SISTEMA`, `¡${myPlayerName} ha cantado ¡UNO!!`);
   } else {
-    alert('Solo puedes cantar UNO si te queda exactamente 1 carta.');
+    alert('Solo puedes cantar UNO con 1 carta en la mano.');
   }
 }
 
-function toggleChat() {
-  const chatBox = document.getElementById('chat-box');
-  if (chatBox) chatBox.classList.toggle('hidden');
-  const badge = document.getElementById('chat-badge');
-  if (badge) badge.innerText = '0';
-}
-
-function sendChatMessage() {
-  const input = document.getElementById('chat-input');
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-
-  if (chatRef) {
-    chatRef.push({
-      sender: myPlayerName,
-      text: text
-    });
-  }
-  input.value = '';
-}
-
+// CHAT LEFT 4 DEAD 2
 function handleChatKey(event) {
   if (event.key === 'Enter') {
-    sendChatMessage();
+    const input = document.getElementById('l4d-chat-input');
+    const text = input.value.trim();
+    if (text) {
+      sendL4DMessage(myPlayerName, text);
+      input.value = '';
+    }
   }
 }
 
-function renderChat(messagesObj) {
-  const container = document.getElementById('chat-messages');
+function sendL4DMessage(sender, text) {
+  if (chatRef) {
+    chatRef.push({ sender, text, timestamp: Date.now() });
+  } else {
+    renderL4DMessage({ sender, text });
+  }
+}
+
+function renderL4DMessage(msgData) {
+  const container = document.getElementById('l4d-chat-messages');
   if (!container) return;
-  container.innerHTML = '';
 
-  const msgs = Object.values(messagesObj);
-  msgs.forEach(m => {
-    const div = document.createElement('div');
-    div.className = 'chat-msg';
-    div.innerHTML = `<strong>${m.sender}</strong><span>${m.text}</span>`;
-    container.appendChild(div);
-  });
+  const msgEl = document.createElement('div');
+  msgEl.className = 'l4d-msg';
+  msgEl.innerHTML = `<strong>${msgData.sender}:</strong><span>${msgData.text}</span>`;
 
-  container.scrollTop = container.scrollHeight;
+  container.appendChild(msgEl);
+
+  setTimeout(() => {
+    msgEl.remove();
+  }, 6000);
+}
+
+// MASCOTA INTERACTIVA
+function triggerPetInteraction() {
+  const petEl = document.getElementById('pet-avatar');
+  const speechEl = document.getElementById('pet-speech');
+  if (!petEl || !speechEl) return;
+
+  currentPetIndex = (currentPetIndex + 1) % PET_AVATARS.length;
+  petEl.innerText = PET_AVATARS[currentPetIndex];
+
+  const randomPhrase = PERU_PHRASES[Math.floor(Math.random() * PERU_PHRASES.length)];
+  speechEl.innerText = randomPhrase;
+  speechEl.classList.remove('hidden');
+
+  setTimeout(() => {
+    speechEl.classList.add('hidden');
+  }, 2500);
+}
+
+function returnToLobby() {
+  if (roomRef && currentGameState.host === myPlayerId) {
+    roomRef.update({ status: 'waiting' });
+  } else if (!roomRef) {
+    currentGameState.status = 'waiting';
+    updateUI();
+  } else {
+    showScreen('screen-lobby');
+  }
 }
 
 function renderWinners(winnersObj) {
   const list = document.getElementById('winners-history-list');
   if (!list) return;
   list.innerHTML = '';
-  const winners = Object.values(winnersObj).reverse();
 
+  const winners = Object.values(winnersObj).reverse();
   winners.forEach(w => {
     const li = document.createElement('li');
     li.className = 'winner-item';
-    li.innerHTML = `<span>${w.name}</span> <span>${w.date || ''}</span>`;
+    li.innerHTML = `
+      <div class="winner-header"><span>🏆 ${w.winner}</span> <span>${w.date || ''}</span></div>
+      <div class="winner-players">Jugadores: ${w.players || 'Varios'}</div>
+    `;
     list.appendChild(li);
   });
 }

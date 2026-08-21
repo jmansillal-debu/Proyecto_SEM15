@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNO Classic Online</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Firebase SDK versión 8 (Compatibilidad con el código JS) -->
+  <link rel="stylesheet" href="styles.css">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
@@ -20,16 +19,16 @@
         <h2>Reglas del Juego</h2>
         <p class="subtitle">UNO CLASSIC</p>
         <div class="rule-box">
-          <h3>Acumulación (+2, +4, +5)</h3>
-          <p>Si te tiran una carta de suma, puedes responder con otra para aumentar el castigo al siguiente jugador.</p>
+          <h3>Acumulación (+2, +4)</h3>
+          <p>Responde con otra suma para aumentar el castigo al siguiente jugador.</p>
         </div>
         <div class="rule-box">
           <h3>Cartas Especiales</h3>
-          <p>Las cartas de color negro (★ y +4) te permiten cambiar el color activo del juego a tu elección.</p>
+          <p>Las cartas negras (★ y +4) cambian el color activo a tu elección.</p>
         </div>
         <div class="rule-box">
           <h3>Cantar UNO</h3>
-          <p>Recuerda presionar el botón ¡UNO! cuando te quede una sola carta en la mano.</p>
+          <p>Presiona ¡UNO! cuando te quede una sola carta en la mano.</p>
         </div>
       </div>
 
@@ -55,10 +54,10 @@
         </div>
       </div>
 
-      <!-- Panel Derecho: Ganadores -->
+      <!-- Panel Derecho: Ganadores e Historial -->
       <div class="panel panel-winners">
-        <h2>🏆 Ganadores</h2>
-        <p class="subtitle">ÚLTIMAS VICTORIAS</p>
+        <h2>🏆 Historial</h2>
+        <p class="subtitle">ÚLTIMAS PARTIDAS</p>
         <ul id="winners-history-list" class="winners-list">
           <li class="empty-msg">Cargando historial...</li>
         </ul>
@@ -90,7 +89,7 @@
       <!-- Zona Superior e Intermedia: Oponentes -->
       <div id="opponents-zone" class="opponents-container"></div>
 
-      <!-- Zona Central: Mazo, Descarte y Estado -->
+      <!-- Zona Central: Mazo, Descarte, Estado y Mascota -->
       <div class="center-zone">
         <div class="status-bar">
           <div>Turno de: <span id="turn-display">---</span></div>
@@ -107,6 +106,12 @@
           </div>
 
           <div id="top-card" class="unocard"></div>
+
+          <!-- MASCOTA PERUANA INTERACTIVA -->
+          <div class="pet-wrapper" onclick="triggerPetInteraction()">
+            <div id="pet-speech" class="speech-bubble hidden">¡Habla causa!</div>
+            <div id="pet-avatar" class="pet-avatar">🦙</div>
+          </div>
         </div>
       </div>
 
@@ -114,13 +119,20 @@
       <div class="bottom-zone">
         <div class="controls-bar">
           <button class="btn btn-uno" onclick="sayUno()">¡UNO!</button>
-          <button class="btn btn-chat" onclick="toggleChat()">💬 Chat <span id="chat-badge">0</span></button>
         </div>
 
         <div class="my-hand-title">Tu Mano (<span id="my-card-count">0</span> cartas)</div>
         <div id="my-hand" class="hand-container"></div>
       </div>
 
+    </div>
+
+    <!-- CHAT ESTILO LEFT 4 DEAD 2 (TRANSPARENTE Y OVERLAY) -->
+    <div id="l4d-chat-container" class="l4d-chat">
+      <div id="l4d-chat-messages" class="l4d-messages"></div>
+      <div class="l4d-input-row">
+        <input type="text" id="l4d-chat-input" placeholder="Presiona Enter para chatear..." onkeypress="handleChatKey(event)">
+      </div>
     </div>
 
     <!-- Modal Cambio de Color -->
@@ -136,18 +148,16 @@
       </div>
     </div>
 
-    <!-- Chat Flotante -->
-    <div id="chat-box" class="chat-container hidden">
-      <div class="chat-header">
-        <span>Chat de la Sala</span>
-        <button onclick="toggleChat()">✕</button>
-      </div>
-      <div id="chat-messages" class="chat-messages"></div>
-      <div class="chat-input-area">
-        <input type="text" id="chat-input" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
-        <button onclick="sendChatMessage()">Enviar</button>
+    <!-- Modal Anuncio de Ganador Global -->
+    <div id="winner-modal" class="modal hidden">
+      <div class="modal-content winner-box">
+        <h1 class="winner-title">👑 ¡ GANADOR ! 👑</h1>
+        <p id="winner-name-display" class="winner-name">---</p>
+        <p class="winner-sub">¡Ha ganado la partida !</p>
+        <button class="btn btn-yellow" onclick="returnToLobby()">VOLVER AL LOBBY</button>
       </div>
     </div>
+
   </div>
 
   <script src="app.js"></script>
