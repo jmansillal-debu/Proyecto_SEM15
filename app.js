@@ -1,3 +1,24 @@
+const firebaseConfig = {
+  apiKey: "AIzaSyD3ENYHqV1eFLPUMAc6HnusYG7-6S-iyqg",
+  authDomain: "proyectouno-84196.firebaseapp.com",
+  databaseURL: "https://proyectouno-84196-default-rtdb.firebaseio.com",
+  projectId: "proyectouno-84196",
+  storageBucket: "proyectouno-84196.appspot.com",
+  messagingSenderId: "926454626159",
+  appId: "1:926454626159:web:f1cfb4B36a810ac1a91a9a",
+  measurementId: "G-V966LGLNZB"
+};
+// CONFIGURACIÓN DE FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyD-EXAMPLE_KEY_1234567890",
+  authDomain: "tu-proyecto.firebaseapp.com",
+  databaseURL: "https://tu-proyecto-default-rtdb.firebaseio.com",
+  projectId: "tu-proyecto",
+  storageBucket: "tu-proyecto.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef123456"
+};
+
 let db = null;
 let isFirebaseConnected = false;
 
