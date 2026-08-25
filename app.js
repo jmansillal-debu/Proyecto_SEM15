@@ -1,14 +1,3 @@
-const firebaseConfig = {
-  apiKey: "AIzaSyD3ENYHqV1eFLPUMAc6HnusYG7-6S-iyqg",
-  authDomain: "proyectouno-84196.firebaseapp.com",
-  databaseURL: "https://proyectouno-84196-default-rtdb.firebaseio.com",
-  projectId: "proyectouno-84196",
-  storageBucket: "proyectouno-84196.appspot.com",
-  messagingSenderId: "926454626159",
-  appId: "1:926454626159:web:f1cfb4B36a810ac1a91a9a",
-  measurementId: "G-V966LGLNZB"
-};
-
 let db = null;
 let isFirebaseConnected = false;
 
@@ -25,6 +14,7 @@ try {
 // Estado global
 let myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
 let myPlayerName = '';
+let selectedAvatarUrl = './assets/foto1.png';
 let currentRoomCode = null;
 let roomRef = null;
 let chatRef = null;
@@ -44,6 +34,12 @@ let targetBadClicks = Math.floor(Math.random() * (10 - 5 + 1)) + 5;
 
 let goodPetClicks = 0;
 let targetGoodClicks = Math.floor(Math.random() * (50 - 30 + 1)) + 30;
+
+function selectAvatar(element, url) {
+  document.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
+  element.classList.add('selected');
+  selectedAvatarUrl = url;
+}
 
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -79,7 +75,7 @@ function createRoom() {
     deck: generateDeck(),
     winnerName: null,
     players: {
-      [myPlayerId]: { id: myPlayerId, name: myPlayerName, hand: [], saidUno: false, isHost: true }
+      [myPlayerId]: { id: myPlayerId, name: myPlayerName, avatar: selectedAvatarUrl, hand: [], saidUno: false, isHost: true }
     }
   };
 
@@ -116,7 +112,7 @@ function joinRoom() {
       if (data.status !== 'waiting') return alert('La partida ya empezó.');
 
       roomRef.child('players/' + myPlayerId).set({
-        id: myPlayerId, name: myPlayerName, hand: [], saidUno: false, isHost: false
+        id: myPlayerId, name: myPlayerName, avatar: selectedAvatarUrl, hand: [], saidUno: false, isHost: false
       }).then(() => {
         listenToRoom();
         showScreen('screen-lobby');
@@ -253,7 +249,7 @@ function renderGameBoard() {
   const turnDisp = document.getElementById('turn-display');
   if (turnDisp) {
     turnDisp.innerText = isMyTurn ? '¡TU TURNO!' : turnPlayerName;
-    turnDisp.style.color = isMyTurn ? '#00ff66' : '#fff';
+    turnDisp.style.color = isMyTurn ? '#63b3ed' : '#ffffff';
   }
 
   document.getElementById('active-color-indicator').className = 'color-dot c-' + currentGameState.activeColor;
@@ -283,11 +279,14 @@ function renderOpponents(activeTurnId) {
   opponents.forEach((opp) => {
     const isActive = opp.id === activeTurnId ? 'active' : '';
     const cardCount = (opp.hand || []).length;
+    const avatarSrc = opp.avatar || './assets/foto1.png';
 
     const div = document.createElement('div');
     div.className = `opponent-card ${isActive}`;
     div.innerHTML = `
-      <div class="opp-avatar">👤</div>
+      <div class="opp-avatar">
+        <img src="${avatarSrc}" class="opp-avatar-img">
+      </div>
       <div class="opp-info">
         <span class="opp-name">${opp.name}</span>
         <span class="opp-count">🎴 ${cardCount} cartas</span>
@@ -459,6 +458,7 @@ function sendL4DMessage(sender, text) {
   else renderL4DMessage({ sender, text });
 }
 
+// CORRECCIÓN DE CHAT: AUTOSCROLL COMPLETO
 function renderL4DMessage(msgData) {
   const container = document.getElementById('l4d-chat-messages');
   if (!container) return;
@@ -468,44 +468,42 @@ function renderL4DMessage(msgData) {
   msgEl.innerHTML = `<strong>${msgData.sender}:</strong><span>${msgData.text}</span>`;
 
   container.appendChild(msgEl);
-  if (container.children.length > 5) container.removeChild(container.firstChild);
+  container.scrollTop = container.scrollHeight; // Mantiene el chat siempre abajo
 }
 
-function movePets() {
-  ['bad-pet', 'good-pet'].forEach(id => {
-    const pet = document.getElementById(id);
-    if (!pet) return;
-    pet.style.left = `${Math.floor(Math.random() * (window.innerWidth - 120)) + 20}px`;
-    pet.style.top = `${Math.floor(Math.random() * (window.innerHeight - 120)) + 20}px`;
-  });
+// SOLO MUEVE A LA MASCOTA BUENA
+function moveGoodPet() {
+  const pet = document.getElementById('good-pet');
+  if (!pet) return;
+  pet.style.left = `${Math.floor(Math.random() * (window.innerWidth - 120)) + 20}px`;
+  pet.style.top = `${Math.floor(Math.random() * (window.innerHeight - 120)) + 20}px`;
 }
 
-setInterval(movePets, 3000);
-window.addEventListener('DOMContentLoaded', movePets);
+setInterval(moveGoodPet, 3000);
+window.addEventListener('DOMContentLoaded', moveGoodPet);
 
 function handleBadPetClick() {
   badPetClicks++;
-  const speech = document.getElementById('bad-pet-speech');
-  speech.innerText = "¡Oye, no molestes!";
-  speech.classList.remove('hidden');
-  setTimeout(() => speech.classList.add('hidden'), 1500);
 
   if (badPetClicks >= targetBadClicks) {
     badPetClicks = 0;
     targetBadClicks = Math.floor(Math.random() * (10 - 5 + 1)) + 5;
     const penalty = Math.floor(Math.random() * 2) + 2;
 
-    speech.innerText = `¡TE AVISÉ! +${penalty} CARTAS 🦙💥`;
-    speech.classList.remove('hidden');
+    const speech = document.getElementById('bad-pet-speech');
+    speech.innerText = `¡ERA UNA TRAMPA! +${penalty} CARTAS 🦙💥`;
 
     if (currentGameState && currentGameState.status === 'playing') {
       applyCardPenalty(penalty);
-      sendL4DMessage('SISTEMA 🦙', `¡${myPlayerName} molestó a la llama y recibió +${penalty} cartas!`);
+      sendL4DMessage('SISTEMA 🦙', `¡${myPlayerName} cayó en la trampa y recibió +${penalty} cartas!`);
     }
+
+    setTimeout(() => {
+      speech.innerText = "¡Presiona aquí y te ayudo! 🎁";
+    }, 2500);
   }
 }
 
-// MASCOTA BUENA Y ANIMACIÓN DE CARTA VOLANDO
 function handleGoodPetClick() {
   goodPetClicks++;
   const speech = document.getElementById('good-pet-speech');
@@ -527,7 +525,7 @@ function handleGoodPetClick() {
       for (let i = 0; i < removeCount; i++) {
         if (myHand.length > 1) {
           myHand.pop();
-          animateFlyCardToPet(); // Lanzar animación por carta
+          animateFlyCardToPet();
         }
       }
 
@@ -545,7 +543,6 @@ function handleGoodPetClick() {
   }
 }
 
-// ANIMACIÓN: VUELO DE LA CARTA HACIA LA MASCOTA BUENA
 function animateFlyCardToPet() {
   const goodPet = document.getElementById('good-pet');
   const handContainer = document.getElementById('my-hand');
@@ -559,13 +556,11 @@ function animateFlyCardToPet() {
   const flyCard = document.createElement('div');
   flyCard.className = 'flying-card';
 
-  // Iniciar desde la mano
   flyCard.style.left = `${handRect.left + handRect.width / 2 - 35}px`;
   flyCard.style.top = `${handRect.top}px`;
 
   flyContainer.appendChild(flyCard);
 
-  // Mover volando hasta la posición de la mascota
   requestAnimationFrame(() => {
     flyCard.style.left = `${petRect.left + 10}px`;
     flyCard.style.top = `${petRect.top + 10}px`;
@@ -573,7 +568,6 @@ function animateFlyCardToPet() {
     flyCard.style.opacity = '0.2';
   });
 
-  // Eliminar al finalizar animación
   setTimeout(() => {
     flyCard.remove();
   }, 850);

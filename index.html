@@ -3,69 +3,79 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UNO Dark Metal Neón</title>
-  <link rel="stylesheet" href="style.css">
+  <title>UNO Dark Industrial</title>
+  <link rel="stylesheet" href="styles.css">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
-  <!-- ELEMENTO PARA ANIMACIÓN DE VOLEO DE CARTAS DE LA MASCOTA -->
+  <!-- CONTENEDOR PARA ANIMACIÓN DE VOLAR CARTAS DE LA MASCOTA -->
   <div id="fly-card-container"></div>
 
-  <!-- MASCOTA 1: TROLL / CASTIGO -->
-  <div id="bad-pet" class="floating-pet-wrapper" onclick="handleBadPetClick()">
-    <div id="bad-pet-speech" class="speech-bubble hidden">¡No me toques!</div>
-    <div id="bad-pet-avatar" class="pet-avatar">🦙</div>
+  <!-- MASCOTA 1: TROLL / CASTIGO (ESTÁTICA, MÁS GRANDE Y CON MENSAJE DE ENGAÑO) -->
+  <div id="bad-pet" class="static-pet-wrapper" onclick="handleBadPetClick()">
+    <div id="bad-pet-speech" class="speech-bubble">¡Presiona aquí y te ayudo! 🎁</div>
+    <div id="bad-pet-avatar" class="pet-avatar bad-pet-size">🦙</div>
   </div>
 
-  <!-- MASCOTA 2: ALIADA / AYUDA -->
+  <!-- MASCOTA 2: ALIADA / AYUDA (MÓVIL) -->
   <div id="good-pet" class="floating-pet-wrapper" onclick="handleGoodPetClick()">
     <div id="good-pet-speech" class="speech-bubble hidden">¡Te ayudo causa!</div>
     <div id="good-pet-avatar" class="pet-avatar">🦜</div>
   </div>
 
-  <!-- PANTALLA PRINCIPAL / MENU -->
+  <!-- PANTALLA PRINCIPAL / MENÚ -->
   <div id="screen-menu" class="screen active">
     <div class="menu-container">
       
       <!-- Panel Izquierdo: Reglas -->
       <div class="panel panel-rules">
-        <h2>REGLAS METAL</h2>
-        <p class="subtitle">UNO DARK EDITION</p>
+        <h2>REGLAS DE JUEGO</h2>
+        <p class="subtitle">EDICIÓN INDUSTRIAL</p>
         <div class="rule-box">
           <h3>Super Acumulación (+2, +4, +6, +8)</h3>
-          <p>Suma golpes destructivos contra tus oponentes sin piedad.</p>
+          <p>Suma cartas de castigo contra tus oponentes sin piedad.</p>
         </div>
         <div class="rule-box">
           <h3>Temporizador Rápido (10s)</h3>
-          <p>Si dudas por más de 10 segundos, sufrirás un castigo de 2 a 3 cartas.</p>
+          <p>Si dudas por más de 10 segundos, sufrirás un castigo automático.</p>
         </div>
         <div class="rule-box">
           <h3>Mascotas en Pantalla</h3>
-          <p>🦙 **Mala:** 5-10 clicks = Castigo +2 o +3.<br>🦜 **Buena:** 30-50 clicks = Roba y quita tus cartas volando.</p>
+          <p>🦙 <b>Mala:</b> ¡Cuidado! Es una trampa.<br>🦜 <b>Buena:</b> Clickea para que se lleve tus cartas volando.</p>
         </div>
       </div>
 
-      <!-- Panel Central: Crear/Unirse -->
+      <!-- Panel Central: Crear / Unirse -->
       <div class="panel panel-main">
         <div class="title-banner">
           <h1>UNO METAL</h1>
-          <p>ULTIMATE NEON EDITION</p>
+          <p>EDICIÓN ESPECIAL</p>
         </div>
         
         <div class="input-group">
-          <label>APODO DEL GUERRERO</label>
-          <input type="text" id="player-name-input" placeholder="Tu nombre..." maxlength="12">
+          <label>APODO DEL JUGADOR</label>
+          <input type="text" id="player-name-input" placeholder="Escribe tu nombre..." maxlength="12">
         </div>
 
-        <button class="btn btn-green-neon" onclick="createRoom()">CREAR MESA</button>
+        <!-- SELECCIÓN DE PERSONAJE / AVATAR -->
+        <div class="avatar-selection-group">
+          <label>ELIGE TU PERSONAJE</label>
+          <div class="avatar-picker">
+            <img src="./assets/foto1.png" class="avatar-option selected" onclick="selectAvatar(this, './assets/foto1.png')">
+            <img src="./assets/foto2.png" class="avatar-option" onclick="selectAvatar(this, './assets/foto2.png')">
+            <img src="./assets/foto3.png" class="avatar-option" onclick="selectAvatar(this, './assets/foto3.png')">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="createRoom()">CREAR MESA</button>
 
         <div class="divider">O ÚNETE A LA BATALLA</div>
 
         <div class="join-group">
           <input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="6">
-          <button class="btn btn-red-matte" onclick="joinRoom()">UNIRSE</button>
+          <button class="btn btn-secondary" onclick="joinRoom()">UNIRSE</button>
         </div>
       </div>
 
@@ -85,14 +95,14 @@
   <div id="screen-lobby" class="screen">
     <div class="lobby-card">
       <h2>MESA DE ESPERA</h2>
-      <p>CÓDIGO DE SALA: <strong id="lobby-code-display" class="neon-text">------</strong></p>
+      <p>CÓDIGO DE SALA: <strong id="lobby-code-display" class="highlight-text">------</strong></p>
       
       <div class="lobby-players">
         <h3>Jugadores Conectados (<span id="player-count">0</span>):</h3>
         <ul id="lobby-players-list"></ul>
       </div>
 
-      <button id="btn-start-game" class="btn btn-green-neon" onclick="startGame()" style="display:none;">INICIAR BATALLA</button>
+      <button id="btn-start-game" class="btn btn-primary" onclick="startGame()" style="display:none;">INICIAR BATALLA</button>
       <p id="waiting-msg" style="display:none;">Esperando que el anfitrión inicie la partida...</p>
     </div>
   </div>
@@ -108,7 +118,7 @@
       <div class="center-zone">
         <div class="status-bar">
           <div>Turno: <span id="turn-display">---</span></div>
-          <div class="timer-badge">⚡ <span id="timer-display">10</span>s</div>
+          <div class="timer-badge">⏳ <span id="timer-display">10</span>s</div>
           <div>Color: <span id="active-color-indicator" class="color-dot"></span></div>
           <div>Suma: <span id="stack-display">+0</span></div>
         </div>
@@ -137,11 +147,11 @@
 
     </div>
 
-    <!-- CHAT ESQUINA INFERIOR DERECHA -->
-    <div id="l4d-chat-container" class="l4d-chat-right">
-      <div id="l4d-chat-messages" class="l4d-messages"></div>
-      <div class="l4d-input-row">
-        <input type="text" id="l4d-chat-input" placeholder="Mensaje + Enter..." onkeypress="handleChatKey(event)">
+    <!-- CHAT CORREGIDO (CAJA FIJA CON SCROLL AUTO) -->
+    <div id="l4d-chat-container" class="chat-fixed-container">
+      <div id="l4d-chat-messages" class="chat-messages-box"></div>
+      <div class="chat-input-row">
+        <input type="text" id="l4d-chat-input" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
       </div>
     </div>
 
@@ -161,10 +171,10 @@
     <!-- Modal Anuncio de Ganador -->
     <div id="winner-modal" class="modal hidden">
       <div class="modal-content winner-box">
-        <h1 class="winner-title">⚡ ¡CAMPEÓN ABSOLUTO! ⚡</h1>
+        <h1 class="winner-title">🏆 ¡CAMPEÓN DE LA MESA! 🏆</h1>
         <p id="winner-name-display" class="winner-name">---</p>
-        <p class="winner-sub">Ha dominado la mesa metal.</p>
-        <button class="btn btn-green-neon" onclick="returnToLobby()">VOLVER AL LOBBY</button>
+        <p class="winner-sub">Ha ganado la partida.</p>
+        <button class="btn btn-primary" onclick="returnToLobby()">VOLVER AL LOBBY</button>
       </div>
     </div>
 
