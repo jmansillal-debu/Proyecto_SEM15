@@ -27,6 +27,7 @@ let hasUsedSkill = false;
 
 let currentRoomCode = null;
 let roomRef = null;
+let chatRef = null;
 let currentGameState = null;
 
 let llamaClicks = 0;
@@ -47,9 +48,9 @@ function initHistory() {
       list.innerHTML = '';
       if (snapshot.exists()) {
         Object.values(snapshot.val()).reverse().forEach(item => {
-          list.innerHTML += `<li><b>${item.name}</b> [${item.date}]</li>`;
+          list.innerHTML += `<li class="text-center">🏆 <b>${item.name}</b> [${item.date}]</li>`;
         });
-      } else { list.innerHTML = '<li class="empty-msg">Sin registro.</li>'; }
+      } else { list.innerHTML = '<li class="empty-msg text-center">Sin campeones registrados aún.</li>'; }
     });
 
     db.ref('history/players').on('value', snapshot => {
@@ -58,9 +59,9 @@ function initHistory() {
       list.innerHTML = '';
       if (snapshot.exists()) {
         Object.values(snapshot.val()).reverse().forEach(item => {
-          list.innerHTML += `<li><b>${item.name}</b> (${item.skill})</li>`;
+          list.innerHTML += `<li class="text-center">👤 <b>${item.name}</b> (${item.skill})</li>`;
         });
-      } else { list.innerHTML = '<li class="empty-msg">Sin datos.</li>'; }
+      } else { list.innerHTML = '<li class="empty-msg text-center">Sin jugadores registrados.</li>'; }
     });
   }
 }
@@ -81,7 +82,6 @@ function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(screenId)?.classList.add('active');
 
-  // CONTROL DE VISIBILIDAD DE MASCOTAS
   const petsLayer = document.getElementById('pets-roaming-layer');
   if (screenId === 'screen-game') {
     petsLayer.classList.remove('pets-hidden');
@@ -93,7 +93,7 @@ function showScreen(screenId) {
 
 function getPlayerName() {
   const input = document.getElementById('player-name-input').value.trim();
-  if (!input) { alert('Por favor, ingresa tu nombre.'); return null; }
+  if (!input) { alert('Por favor, ingresa tu apodo de jugador.'); return null; }
   myPlayerName = input;
   return myPlayerName;
 }
@@ -125,7 +125,11 @@ function createRoom() {
 
   if (isFirebaseConnected && db) {
     roomRef = db.ref('rooms/' + code);
-    roomRef.set(initialData).then(() => { listenToRoom(); showScreen('screen-lobby'); });
+    roomRef.set(initialData).then(() => { 
+      listenToRoom(); 
+      listenToChat();
+      showScreen('screen-lobby'); 
+    });
   } else {
     currentGameState = initialData;
     document.getElementById('lobby-code-display').innerText = currentRoomCode;
@@ -137,16 +141,20 @@ function createRoom() {
 function joinRoom() {
   if (!getPlayerName()) return;
   const code = document.getElementById('room-code-input').value.trim().toUpperCase();
-  if (!code) return alert('Código inválido.');
+  if (!code) return alert('Por favor ingresa un código válido.');
 
   currentRoomCode = code;
   if (isFirebaseConnected && db) {
     roomRef = db.ref('rooms/' + code);
     roomRef.once('value', snapshot => {
-      if (!snapshot.exists()) return alert('Sala no encontrada.');
+      if (!snapshot.exists()) return alert('La sala ingresada no existe.');
       roomRef.child('players/' + myPlayerId).set({
         id: myPlayerId, name: myPlayerName, avatar: selectedAvatarUrl, skill: selectedSkill, hand: [], isHost: false
-      }).then(() => { listenToRoom(); showScreen('screen-lobby'); });
+      }).then(() => { 
+        listenToRoom(); 
+        listenToChat();
+        showScreen('screen-lobby'); 
+      });
     });
   }
 }
@@ -160,6 +168,45 @@ function listenToRoom() {
       updateUI();
     });
   }
+}
+
+// ARREGLO DEL CHAT EN TIEMPO REAL MULTIJUGADOR
+function listenToChat() {
+  if (!currentRoomCode || !isFirebaseConnected || !db) return;
+  chatRef = db.ref('chats/' + currentRoomCode);
+  chatRef.on('child_added', snapshot => {
+    const msgData = snapshot.val();
+    renderL4DMessage(msgData);
+  });
+}
+
+function handleChatKey(event) {
+  if (event.key === 'Enter') {
+    const input = document.getElementById('l4d-chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    if (isFirebaseConnected && db && currentRoomCode) {
+      db.ref('chats/' + currentRoomCode).push({
+        sender: myPlayerName,
+        text: text,
+        timestamp: Date.now()
+      });
+    } else {
+      renderL4DMessage({ sender: myPlayerName, text: text });
+    }
+    input.value = '';
+  }
+}
+
+function renderL4DMessage(msgData) {
+  const container = document.getElementById('l4d-chat-messages');
+  if (!container) return;
+  const msgEl = document.createElement('div');
+  msgEl.className = 'chat-msg';
+  msgEl.innerHTML = `<b>${msgData.sender}:</b> ${msgData.text}`;
+  container.appendChild(msgEl);
+  container.scrollTop = container.scrollHeight;
 }
 
 function startGame() {
@@ -178,7 +225,7 @@ function startGame() {
 
   const updatedState = {
     ...currentGameState, status: 'playing', deck: deck, players: players, topCard: topCard,
-    activeColor: topCard.color, turnOrder: playerKeys, currentTurnIndex: 0, stack: 0
+    activeColor: topCard.color, turnOrder: playerKeys, currentTurnIndex: 0, stack: 0, winnerName: null
   };
 
   if (roomRef) roomRef.update(updatedState);
@@ -192,12 +239,22 @@ function updateUI() {
     showScreen('screen-lobby');
     const playersArr = Object.values(currentGameState.players || {});
     document.getElementById('player-count').innerText = playersArr.length;
-    document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `<li><b>${p.name}</b> (${p.skill})</li>`).join('');
-    document.getElementById('btn-start-game').style.display = currentGameState.host === myPlayerId ? 'block' : 'none';
+    document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `<li class="text-center"><b>${p.name}</b><br><small style="color:var(--text-muted);">${p.skill}</small></li>`).join('');
+    
+    const isHost = currentGameState.host === myPlayerId;
+    document.getElementById('btn-start-game').style.display = isHost ? 'block' : 'none';
+    document.getElementById('waiting-msg-container').style.display = isHost ? 'none' : 'block';
+
   } else if (currentGameState.status === 'playing') {
     showScreen('screen-game');
+    document.getElementById('winner-modal').classList.add('hidden');
     renderGameBoard();
     startTurnTimer();
+  } else if (currentGameState.status === 'finished') {
+    // SINCRONIZACIÓN DE MODAL DE VICTORIA PARA TODOS LOS JUGADORES
+    document.getElementById('winner-name-display').innerText = currentGameState.winnerName || 'Ganador Desconocido';
+    document.getElementById('winner-modal').classList.remove('hidden');
+    clearInterval(turnTimer);
   }
 }
 
@@ -223,7 +280,7 @@ function renderGameBoard() {
   const turnPlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
   const isMyTurn = turnPlayerId === myPlayerId;
 
-  document.getElementById('turn-display').innerText = isMyTurn ? 'TU TURNO' : currentGameState.players[turnPlayerId]?.name;
+  document.getElementById('turn-display').innerText = isMyTurn ? '¡TU TURNO!' : currentGameState.players[turnPlayerId]?.name;
   document.getElementById('active-color-indicator').className = 'color-badge c-' + currentGameState.activeColor;
   document.getElementById('stack-display').innerText = '+' + (currentGameState.stack || 0);
 
@@ -255,9 +312,9 @@ function renderOpponents(turnPlayerId) {
     oppEl.className = `opponent-mini-card ${isTurn ? 'active-turn' : ''}`;
     oppEl.innerHTML = `
       <img src="${player.avatar}" class="opp-avatar">
-      <div>
+      <div class="text-center">
         <div class="opp-name">${player.name}</div>
-        <div style="font-size:0.7rem; color:var(--text-muted);">${cardCount} cartas</div>
+        <div style="font-size:0.72rem; color:var(--text-muted);">${cardCount} cartas</div>
       </div>
     `;
     container.appendChild(oppEl);
@@ -294,14 +351,14 @@ function playCard(card) {
 
   if (stack > 0) {
     if (card.value !== '+2' && card.value !== '+4') {
-      alert(`¡Hay una acumulación activa de +${stack}! Debes responder con +2 o +4, o robar.`);
+      alert(`¡Existe un acumulado activo de +${stack}! Debes colocar una carta +2 o +4, o robar.`);
       return;
     }
   }
 
   const isValid = card.color === 'negro' || card.color === currentGameState.activeColor || card.value === topCard.value;
   if (!isValid) {
-    alert('Esta carta no coincide con el color o valor de la mesa.');
+    alert('Esta carta no coincide con el color ni con el número de la mesa.');
     return;
   }
 
@@ -343,11 +400,23 @@ function executeCardEffect(card) {
   if (currentGameState.players[myPlayerId].hand.length === 0) {
     currentGameState.status = 'finished';
     currentGameState.winnerName = myPlayerName;
-    document.getElementById('winner-name-display').innerText = myPlayerName;
-    document.getElementById('winner-modal').classList.remove('hidden');
+    saveWinnerToHistory(myPlayerName);
   }
 
   nextTurn(skipTurn);
+}
+
+function saveWinnerToHistory(name) {
+  if (isFirebaseConnected && db) {
+    db.ref('history/winners').push({
+      name: name,
+      date: new Date().toLocaleDateString()
+    });
+    db.ref('history/players').push({
+      name: name,
+      skill: selectedSkill
+    });
+  }
 }
 
 function nextTurn(skip = false) {
@@ -383,7 +452,31 @@ function drawCardCurrentPlayer() {
   nextTurn();
 }
 
-// MASCOTAS - MOVIMIENTO ÚNICAMENTE VERTICAL (ARRIBA Y ABAJO)
+function sayUno() {
+  const myHand = currentGameState?.players[myPlayerId]?.hand;
+  if (myHand && myHand.length === 1) {
+    alert('¡Has gritado UNO exitosamente!');
+    if (isFirebaseConnected && db && currentRoomCode) {
+      db.ref('chats/' + currentRoomCode).push({
+        sender: 'SISTEMA',
+        text: `¡${myPlayerName} HA GRITADO UNO! 🚨`
+      });
+    }
+  } else {
+    alert('¡Solo puedes cantar UNO cuando te quede 1 carta!');
+  }
+}
+
+function returnToLobby() {
+  document.getElementById('winner-modal').classList.add('hidden');
+  if (currentGameState) {
+    currentGameState.status = 'waiting';
+    if (roomRef) roomRef.child('status').set('waiting');
+    else updateUI();
+  }
+}
+
+// MOVIMIENTO EXCLUSIVAMENTE VERTICAL DE MASCOTAS
 let petInterval = null;
 function initRoamingPets() {
   if (petInterval) clearInterval(petInterval);
@@ -392,7 +485,7 @@ function initRoamingPets() {
   const goodPet = document.getElementById('good-pet');
 
   function movePetsVertical() {
-    const maxY = window.innerHeight - 100;
+    const maxY = window.innerHeight - 110;
     if (badPet) badPet.style.top = `${Math.floor(Math.random() * maxY)}px`;
     if (goodPet) goodPet.style.top = `${Math.floor(Math.random() * maxY)}px`;
   }
@@ -431,28 +524,9 @@ function handleGoodPetClick() {
 }
 
 function useSpecialSkill() {
-  if (hasUsedSkill) return alert('Habilidad ya utilizada.');
+  if (hasUsedSkill) return alert('Ya has utilizado tu habilidad especial en esta partida.');
   hasUsedSkill = true;
   if (selectedSkill === 'Escudo Táctico') currentGameState.stack = 0;
+  if (roomRef) roomRef.child('stack').set(currentGameState.stack);
   updateUI();
-}
-
-function handleChatKey(event) {
-  if (event.key === 'Enter') {
-    const input = document.getElementById('l4d-chat-input');
-    if (input.value.trim()) {
-      renderL4DMessage({ sender: myPlayerName, text: input.value.trim() });
-      input.value = '';
-    }
-  }
-}
-
-function renderL4DMessage(msgData) {
-  const container = document.getElementById('l4d-chat-messages');
-  if (!container) return;
-  const msgEl = document.createElement('div');
-  msgEl.className = 'chat-msg';
-  msgEl.innerHTML = `<b>${msgData.sender}:</b> ${msgData.text}`;
-  container.appendChild(msgEl);
-  container.scrollTop = container.scrollHeight;
 }
