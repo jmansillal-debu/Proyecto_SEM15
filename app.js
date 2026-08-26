@@ -1,11 +1,12 @@
+// CONFIGURACIÓN DE FIREBASE CORREGIDA (FORMATO COMPAT DE CDN)
 const firebaseConfig = {
   apiKey: "AIzaSyD3ENYHqV1eFLPUMAc6HnusYG7-6S-iyqg",
   authDomain: "proyectouno-84196.firebaseapp.com",
   databaseURL: "https://proyectouno-84196-default-rtdb.firebaseio.com",
   projectId: "proyectouno-84196",
-  storageBucket: "proyectouno-84196.appspot.com",
+  storageBucket: "proyectouno-84196.firebasestorage.app",
   messagingSenderId: "926454626159",
-  appId: "1:926454626159:web:f1cfb4B36a810ac1a91a9a",
+  appId: "1:926454626159:web:f1cfb4836a810ac1a91a9a",
   measurementId: "G-V966LGLNZB"
 };
 
@@ -13,12 +14,12 @@ let db = null;
 let isFirebaseConnected = false;
 
 try {
-  if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "TU_API_KEY_REAL") {
+  if (typeof firebase !== 'undefined') {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.database();
     isFirebaseConnected = true;
   }
-} catch (e) { console.warn("Modo local.", e); }
+} catch (e) { console.warn("Modo local activo.", e); }
 
 let myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
 let myPlayerName = '';
@@ -30,16 +31,49 @@ let currentRoomCode = null;
 let roomRef = null;
 let chatRef = null;
 let currentGameState = null;
-let pendingWildCard = null;
-
-let turnTimer = null;
-let timeLeft = 10;
 
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '+4', '+6', '+8', '🚫', '🔄'];
 
-let goodPetClicks = 0;
-let targetGoodClicks = 15;
+function initHistory() {
+  if (isFirebaseConnected && db) {
+    db.ref('history/winners').on('value', snapshot => {
+      const list = document.getElementById('winners-history-list');
+      if (!list) return;
+      list.innerHTML = '';
+      if (snapshot.exists()) {
+        Object.values(snapshot.val()).reverse().forEach(item => {
+          list.innerHTML += `<li><b>${item.name}</b> (${item.date})</li>`;
+        });
+      } else { list.innerHTML = '<li class="empty-msg">Sin victorias...</li>'; }
+    });
+
+    db.ref('history/players').on('value', snapshot => {
+      const list = document.getElementById('all-players-history-list');
+      if (!list) return;
+      list.innerHTML = '';
+      if (snapshot.exists()) {
+        Object.values(snapshot.val()).reverse().forEach(item => {
+          list.innerHTML += `<li><b>${item.name}</b> - Habilidad: ${item.skill}</li>`;
+        });
+      } else { list.innerHTML = '<li class="empty-msg">Sin registros...</li>'; }
+    });
+  }
+}
+
+function savePlayerRegistration(name, skill) {
+  if (isFirebaseConnected && db) {
+    db.ref('history/players').push({ name, skill, date: new Date().toLocaleTimeString() });
+  }
+}
+
+function saveWinnerRecord(winnerName) {
+  if (isFirebaseConnected && db) {
+    db.ref('history/winners').push({ name: winnerName, date: new Date().toLocaleDateString() });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { initHistory(); });
 
 function selectAvatar(element, url, skillName, skillDesc) {
   document.querySelectorAll('.avatar-card').forEach(el => el.classList.remove('selected'));
@@ -58,6 +92,7 @@ function getPlayerName() {
   const input = document.getElementById('player-name-input').value.trim();
   if (!input) { alert('Ingresa tu nombre.'); return null; }
   myPlayerName = input;
+  savePlayerRegistration(myPlayerName, selectedSkill);
   return myPlayerName;
 }
 
@@ -125,7 +160,7 @@ function listenToRoom() {
   }
   if (isFirebaseConnected && db) {
     chatRef = db.ref('chats/' + currentRoomCode);
-    chatRef.off(); 
+    chatRef.off();
     chatRef.on('child_added', snapshot => {
       if (snapshot.exists()) renderL4DMessage(snapshot.val());
     });
@@ -165,6 +200,21 @@ function updateUI() {
   }
 }
 
+function renderCardElement(card) {
+  const cardEl = document.createElement('div');
+  cardEl.className = `unocard c-${card.color} 3d-card`;
+  
+  const valDisplay = card.value;
+  cardEl.innerHTML = `
+    <span class="card-mini-corner">${valDisplay}</span>
+    <div class="card-inner-oval">
+      <span class="card-symbol">${valDisplay}</span>
+    </div>
+    <span class="card-mini-corner bottom">${valDisplay}</span>
+  `;
+  return cardEl;
+}
+
 function renderGameBoard() {
   const turnPlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
   const isMyTurn = turnPlayerId === myPlayerId;
@@ -175,8 +225,14 @@ function renderGameBoard() {
 
   const topCardSpot = document.getElementById('top-card');
   if (topCardSpot && currentGameState.topCard) {
-    topCardSpot.className = `unocard c-${currentGameState.topCard.color}`;
-    topCardSpot.innerHTML = `<div class="card-inner">${currentGameState.topCard.value}</div>`;
+    topCardSpot.className = `unocard c-${currentGameState.topCard.color} 3d-card`;
+    topCardSpot.innerHTML = `
+      <span class="card-mini-corner">${currentGameState.topCard.value}</span>
+      <div class="card-inner-oval">
+        <span class="card-symbol">${currentGameState.topCard.value}</span>
+      </div>
+      <span class="card-mini-corner bottom">${currentGameState.topCard.value}</span>
+    `;
   }
 
   renderMyHand(isMyTurn);
@@ -192,13 +248,60 @@ function renderMyHand(isMyTurn) {
   document.getElementById('my-card-count').innerText = myData.hand.length;
 
   myData.hand.forEach((card) => {
-    const cardEl = document.createElement('div');
-    cardEl.className = `unocard c-${card.color}`;
-    cardEl.innerHTML = `<div class="card-inner">${card.value}</div>`;
+    const cardEl = renderCardElement(card);
     cardEl.onclick = () => { if (isMyTurn) playCard(card); };
     container.appendChild(cardEl);
   });
 }
+
+function handleLlamaClick() {
+  let myHand = [...(currentGameState?.players[myPlayerId]?.hand || [])];
+  myHand.push({ color: 'negro', value: '+2', id: Math.random().toString(36).substr(2, 9) });
+
+  if (roomRef) {
+    roomRef.child(`players/${myPlayerId}/hand`).set(myHand);
+  } else {
+    currentGameState.players[myPlayerId].hand = myHand;
+    updateUI();
+  }
+  sendL4DMessage('MASCOTA 🦙', `¡La Llama otorgó una carta +2 a ${myPlayerName}!`);
+}
+
+function handleGoodPetClick() {
+  let myHand = [...(currentGameState?.players[myPlayerId]?.hand || [])];
+
+  if (myHand.length <= 1) {
+    sendL4DMessage('MASCOTA 🦜', `¡${myPlayerName} intentó ganar usando el Loro! Castigo de +4 cartas.`);
+    for (let i = 0; i < 4; i++) {
+      myHand.push({ color: COLORS[i % 4], value: `${i + 1}`, id: Math.random().toString(36).substr(2, 9) });
+    }
+  } else {
+    myHand.pop(); 
+    sendL4DMessage('MASCOTA 🦜', `El Loro Dron ayudó a descartar 1 carta de ${myPlayerName}.`);
+  }
+
+  if (roomRef) {
+    roomRef.child(`players/${myPlayerId}/hand`).set(myHand);
+  } else {
+    currentGameState.players[myPlayerId].hand = myHand;
+    updateUI();
+  }
+}
+
+function movePetsSlowly() {
+  const llama = document.getElementById('bad-pet');
+  const loro = document.getElementById('good-pet');
+  
+  if (llama) {
+    const offsetY = Math.floor(Math.random() * 40) - 20;
+    llama.style.transform = `translateY(${offsetY}px)`;
+  }
+  if (loro) {
+    const offsetY = Math.floor(Math.random() * 40) - 20;
+    loro.style.transform = `translateY(${offsetY}px)`;
+  }
+}
+setInterval(movePetsSlowly, 3000);
 
 function useSpecialSkill() {
   if (hasUsedSkill) return alert('Ya usaste tu habilidad en esta partida.');
@@ -206,7 +309,7 @@ function useSpecialSkill() {
 
   if (selectedSkill === 'Escudo Táctico') {
     currentGameState.stack = 0;
-    sendL4DMessage('HABILIDAD', `¡${myPlayerName} activó Escudo Táctico y anuló la suma!`);
+    sendL4DMessage('HABILIDAD', `¡${myPlayerName} activó Escudo Táctico!`);
   } else if (selectedSkill === 'Robo Rápido') {
     let myHand = currentGameState.players[myPlayerId].hand;
     myHand.push({ color: 'negro', value: '+4', id: Math.random().toString(36).substr(2, 9) });
@@ -214,35 +317,6 @@ function useSpecialSkill() {
   }
   updateUI();
 }
-
-function handleLlamaClick() {
-  const speech = document.getElementById('bad-pet-speech');
-  speech.innerText = "¡Toma una carta de suma táctica! 🎁";
-
-  let myHand = [...(currentGameState?.players[myPlayerId]?.hand || [])];
-  myHand.push({ color: 'negro', value: '+2', id: Math.random().toString(36).substr(2, 9) });
-
-  if (roomRef) {
-    roomRef.child(`players/${myPlayerId}/hand`).set(myHand);
-  }
-  sendL4DMessage('MASCOTA 🦙', `¡La Llama le regaló una carta +2 a ${myPlayerName}!`);
-}
-
-function movePets() {
-  const llama = document.getElementById('bad-pet');
-  const loro = document.getElementById('good-pet');
-  
-  if (llama) {
-    llama.style.left = `${Math.floor(Math.random() * (window.innerWidth - 100))}px`;
-    llama.style.top = `${Math.floor(Math.random() * (window.innerHeight - 100))}px`;
-  }
-  if (loro) {
-    loro.style.left = `${Math.floor(Math.random() * (window.innerWidth - 100))}px`;
-    loro.style.top = `${Math.floor(Math.random() * (window.innerHeight - 100))}px`;
-  }
-}
-
-setInterval(movePets, 4000);
 
 function handleChatKey(event) {
   if (event.key === 'Enter') {
