@@ -3,152 +3,124 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UNO :: TACTICAL TERMINAL</title>
+  <title>UNO - Multijugador</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   
-  <!-- LIBRERÍAS DE FIREBASE (CDN COMPAT) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
-  <!-- CAPA DE MASCOTAS VOLANTES (NO INTERRUMPEN CLICS DEL JUEGO) -->
+  <!-- CAPA DE MASCOTAS DRON -->
   <div id="pets-roaming-layer">
     <div id="bad-pet" class="roaming-pet" onclick="handleLlamaClick()">
-      <div id="bad-pet-speech" class="pet-tooltip">🦙 CLICS: <span id="llama-clicks">0</span>/40 (+1 Carta)</div>
+      <div class="pet-tooltip">🦙 LLAMA: <span id="llama-clicks">0</span>/40 (+1 Carta)</div>
       <div class="pet-sprite">🦙</div>
     </div>
 
     <div id="good-pet" class="roaming-pet" onclick="handleGoodPetClick()">
-      <div id="good-pet-speech" class="pet-tooltip">🦜 CLICS: <span id="loro-clicks">0</span>/40 (-1 Carta)</div>
+      <div class="pet-tooltip">🦜 LORO: <span id="loro-clicks">0</span>/40 (-1 Carta)</div>
       <div class="pet-sprite">🦜</div>
     </div>
   </div>
 
-  <!-- PANTALLA PRINCIPAL / MENÚ -->
+  <!-- MENU PRINCIPAL -->
   <div id="screen-menu" class="screen active">
     <div class="terminal-grid">
       
-      <!-- Panel 1: Intel & Reglas -->
       <aside class="term-panel panel-left">
-        <div class="term-header">> SYS.RULES_INTEL</div>
-        
+        <div class="term-header">> REGLAS_DEL_SISTEMA</div>
         <div class="term-card">
-          <h4>[0x01] ACUMULACIÓN SECUENCIAL</h4>
-          <p>Encadena +2, +4, +6, +8. Si no respondes con un valor de suma equivalente o mayor, absorbes la carga completa del buffer.</p>
+          <h4>ACUMULACIÓN</h4>
+          <p>Encadena +2 o +4. Si no puedes responder con una suma, recibes el total acumulado en tu mano.</p>
         </div>
-        
         <div class="term-card">
-          <h4>[0x02] HABILIDADES DE OPERADOR</h4>
-          <p>Habilidad única por partida: Escudo Anti-Suma, Espionaje de Mano, Inyección de Suma y Purga de Mano.</p>
+          <h4>FLOTANTES</h4>
+          <p>Haz 40 clics en la 🦙 Llama para recibir una carta táctica o en el 🦜 Loro para purgar una carta de tu mano.</p>
         </div>
-
         <div class="term-card">
-          <h4>[0x03] NODOS DRON (MASCOTAS)</h4>
-          <p>🦙 <b>Dron Llama:</b> 40 impactos directos te otorgan 1 carta táctica.<br>🦜 <b>Dron Loro:</b> 40 impactos purgan 1 carta. ¡Cuidado! Si tenías 1 sola carta, recibes +4 de penalización por descarte ilegal.</p>
-        </div>
-
-        <div class="term-card">
-          <h4>[0x04] SYSTEM MONITOR</h4>
-          <p>Kernel v4.0.8 // Encriptación SSL en canal // Latencia: 12ms // Protocolo P2P activo.</p>
+          <h4>MONITOR</h4>
+          <p>Estado: En Línea | Protocolo: WebSockets Firebase | Latencia: Normal.</p>
         </div>
       </aside>
 
-      <!-- Panel Central: Configuración de Operador -->
       <main class="term-panel panel-center">
         <div class="term-banner">
-          <h1>>_ UNO_TACTICAL_TERMINAL</h1>
-          <p class="blink">STATUS: READY_FOR_DEPLOYMENT</p>
+          <h1>>_ UNO_COMMAND_CENTER</h1>
+          <p class="blink">SISTEMA LISTO PARA OPERAR</p>
         </div>
         
         <div class="term-card">
-          <label class="term-label">> INGRESE OPERATOR_ID</label>
-          <input type="text" id="player-name-input" class="term-input" placeholder="ROOT_USER" maxlength="12">
+          <label class="term-label">> IDENTIFICADOR DE JUGADOR</label>
+          <input type="text" id="player-name-input" class="term-input" placeholder="OPERADOR_X" maxlength="12">
         </div>
 
         <div class="term-card">
-          <label class="term-label">> SELECCIONE CLASE DE OPERADOR</label>
+          <label class="term-label">> SELECCIONAR ALGUN ESPECIAL</label>
           <div class="avatar-picker">
-            <div class="avatar-card selected" onclick="selectAvatar(this, './assets/foto1.jpeg', 'Escudo Táctico', 'Anula el stack de suma acumulada.')">
+            <div class="avatar-card selected" onclick="selectAvatar(this, './assets/foto1.jpeg', 'Escudo Táctico', 'Anula la acumulación de suma.')">
               <img src="./assets/foto1.jpeg" class="avatar-img">
               <span class="avatar-tag">ESCUDO</span>
             </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto2.jfif', 'Espionaje', 'Revela las cartas del objetivo.')">
+            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto2.jfif', 'Espionaje', 'Visualiza la mano del rival.')">
               <img src="./assets/foto2.jfif" class="avatar-img">
               <span class="avatar-tag">VISIÓN</span>
             </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto3.jfif', 'Robo Rápido', 'Inyecta +4 a tu mano.')">
+            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto3.jfif', 'Robo Rápido', 'Añade un +4 a tu inventario.')">
               <img src="./assets/foto3.jfif" class="avatar-img">
               <span class="avatar-tag">SUMA+</span>
             </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto4.jfif', 'Purga', 'Descarta 2 cartas de tu buffer.')">
+            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto4.jfif', 'Purga', 'Elimina 2 cartas de tu mano.')">
               <img src="./assets/foto4.jfif" class="avatar-img">
               <span class="avatar-tag">PURGA</span>
             </div>
           </div>
-          <p id="skill-description" class="term-desc">> Habilidad: Anula el stack de suma acumulada.</p>
+          <p id="skill-description" class="term-desc">> Habilidad: Anula la acumulación de suma.</p>
         </div>
 
-        <button class="term-btn btn-main" onclick="createRoom()">[ EXECUTE: CREATE_LOBBY ]</button>
-        <div class="term-divider">------------------ OR ------------------</div>
+        <button class="term-btn btn-main" onclick="createRoom()">[ CREAR SALA DE JUEGO ]</button>
+        <div class="term-divider">---- O CONÉCTATE A UNA SALA ----</div>
         <div class="join-row">
-          <input type="text" id="room-code-input" class="term-input" placeholder="NET_CODE" maxlength="6">
-          <button class="term-btn btn-sub" onclick="joinRoom()">[ CONNECT ]</button>
+          <input type="text" id="room-code-input" class="term-input" placeholder="CÓDIGO" maxlength="6">
+          <button class="term-btn btn-sub" onclick="joinRoom()">[ UNIRSE ]</button>
         </div>
       </main>
 
-      <!-- Panel 3: Registro & Telemetría (PC Extra Info) -->
       <aside class="term-panel panel-right">
-        <div class="term-header">> DATABASE.LOGS</div>
-
+        <div class="term-header">> REGISTROS_DE_RED</div>
         <div class="term-card history-box">
           <div class="term-tag">HISTORIAL DE VICTORIAS</div>
-          <ul id="winners-history-list" class="term-list">
-            <li class="empty-msg">Cargando registros...</li>
-          </ul>
+          <ul id="winners-history-list" class="term-list"><li class="empty-msg">Cargando...</li></ul>
         </div>
-
         <div class="term-card history-box">
-          <div class="term-tag">REGISTRO DE JUGADORES</div>
-          <ul id="all-players-history-list" class="term-list">
-            <li class="empty-msg">Sin datos...</li>
-          </ul>
-        </div>
-
-        <div class="term-card pc-telemetry">
-          <div class="term-tag">TELEMETRÍA DE RED</div>
-          <div class="telemetry-line"><span>SERVER:</span> <span>ONLINE (SA-EAST)</span></div>
-          <div class="telemetry-line"><span>BUFFER:</span> <span>STACKING ENABLED</span></div>
-          <div class="telemetry-line"><span>FPS:</span> <span>60.0 LOCKED</span></div>
+          <div class="term-tag">JUGADORES REGISTRADOS</div>
+          <ul id="all-players-history-list" class="term-list"><li class="empty-msg">Sin datos.</li></ul>
         </div>
       </aside>
 
     </div>
   </div>
 
-  <!-- PANTALLA: LOBBY -->
+  <!-- PANTALLA DE LOBBY -->
   <div id="screen-lobby" class="screen">
     <div class="lobby-wrapper">
       <div class="term-panel lobby-box">
-        <div class="term-header">> ROOM_LOBBY // MATRIX_GATE</div>
-        
+        <div class="term-header">> SALA_DE_ESPERA</div>
         <div class="term-card lobby-code-card">
-          <span class="term-label">CÓDIGO DE ACCESO DIRECTO:</span>
+          <span class="term-label">CÓDIGO DE ENLACE:</span>
           <div id="lobby-code-display" class="code-glow">------</div>
         </div>
-
         <div class="term-card lobby-players-container">
           <div class="term-tag">ESCUADRÓN CONECTADO (<span id="player-count">0</span>/4)</div>
           <ul id="lobby-players-list" class="lobby-grid-list"></ul>
         </div>
-
         <div class="lobby-controls">
-          <button id="btn-start-game" class="term-btn btn-main" onclick="startGame()" style="display:none;">[ START_MISSION ]</button>
+          <button id="btn-start-game" class="term-btn btn-main" onclick="startGame()" style="display:none;">[ INICIAR DESPLIEGUE ]</button>
           <div id="waiting-msg-container" class="term-card text-center" style="display:none;">
-            <p id="waiting-msg" class="blink">> Esperando que el Host inicie la transmisión...</p>
+            <p id="waiting-msg" class="blink">> Esperando que el host inicie la partida...</p>
           </div>
         </div>
       </div>
@@ -159,60 +131,60 @@
   <div id="screen-game" class="screen">
     <div class="game-cyber-container">
 
-      <!-- BARRA DE COMPAÑEROS / OPONENTES -->
+      <!-- OPONENTES CON AVATARES MÁS GRANDES -->
       <header id="opponents-zone" class="opponents-bar"></header>
 
-      <!-- ZONA DE MESA CENTRAL -->
+      <!-- MESA CENTRAL -->
       <main class="table-zone">
         <div class="hud-status-bar">
           <div class="hud-item"><span class="hud-lbl">TURNO:</span> <span id="turn-display" class="hud-val">---</span></div>
           <div class="hud-item"><span class="hud-lbl">TIEMPO:</span> <span id="timer-display" class="hud-val">10</span>s</div>
           <div class="hud-item"><span class="hud-lbl">COLOR:</span> <span id="active-color-indicator" class="color-badge"></span></div>
-          <div class="hud-item"><span class="hud-lbl">STACK:</span> <span id="stack-display" class="hud-val">+0</span></div>
+          <div class="hud-item"><span class="hud-lbl">ACUMULADO:</span> <span id="stack-display" class="hud-val">+0</span></div>
         </div>
 
         <div class="deck-arena">
           <div class="deck-spot" onclick="drawCardCurrentPlayer()">
             <div class="cyber-card card-back">
-              <div class="card-inner"><span>UNO</span></div>
+              <div class="card-inner">UNO</div>
             </div>
-            <span class="deck-label">[ROBAR]</span>
+            <span class="deck-label">[ROBAR CARTA]</span>
           </div>
 
           <div class="deck-spot">
             <div id="top-card-container">
               <div id="top-card" class="cyber-card"></div>
             </div>
-            <span class="deck-label">[MESA]</span>
+            <span class="deck-label">[CARTA EN MESA]</span>
           </div>
         </div>
       </main>
 
-      <!-- CHAT DE PC FLOTANTE / INTEGRADO -->
+      <!-- CHAT COMPACTO -->
       <div id="l4d-chat-container" class="term-panel game-chat">
-        <div class="term-header">> COMM_LINK</div>
+        <div class="term-header">> CANAL_DE_COMUNICACIÓN</div>
         <div id="l4d-chat-messages" class="chat-logs"></div>
-        <input type="text" id="l4d-chat-input" class="term-input chat-in" placeholder="Mensaje..." onkeypress="handleChatKey(event)">
+        <input type="text" id="l4d-chat-input" class="term-input chat-in" placeholder="Enviar mensaje..." onkeypress="handleChatKey(event)">
       </div>
 
-      <!-- CONTROLES Y MANO DEL JUGADOR -->
+      <!-- ZONA INFERIOR / JUGADOR -->
       <footer class="player-zone">
         <div class="action-bar">
           <button id="btn-use-skill" class="term-btn btn-sub" onclick="useSpecialSkill()">[ USAR HABILIDAD ]</button>
-          <button class="term-btn btn-warn" onclick="sayUno()">[ ¡UNO! ]</button>
+          <button class="term-btn btn-warn" onclick="sayUno()">[ ¡GRITAR UNO! ]</button>
         </div>
         <div class="hand-wrapper">
-          <div class="hand-header">> BUFFER DE MANO (<span id="my-card-count">0</span> CARTAS)</div>
+          <div class="hand-header">> TU BUFFER DE CARTAS (<span id="my-card-count">0</span>)</div>
           <div id="my-hand" class="hand-deck"></div>
         </div>
       </footer>
 
     </div>
 
-    <!-- MODAL DE COLOR -->
+    <!-- MODAL DE SELECCIÓN DE COLOR -->
     <div id="color-modal" class="modal hidden">
       <div class="term-panel modal-box">
-        <div class="term-header">> SELECCIONAR COLOR DE MATRIZ</div>
+        <div class="term-header">> SELECCIONAR COLOR TÁCTICO</div>
         <div class="color-grid">
           <button class="btn-color c-rojo" onclick="selectColor('rojo')">ROJO</button>
           <button class="btn-color c-azul" onclick="selectColor('azul')">AZUL</button>
@@ -225,9 +197,8 @@
     <!-- MODAL DE VICTORIA -->
     <div id="winner-modal" class="modal hidden">
       <div class="term-panel modal-box text-center">
-        <h1 class="winner-title">> MISSION_ACCOMPLISHED</h1>
+        <h1 class="winner-title">> VICTORIA ALCANZADA</h1>
         <p id="winner-name-display" class="winner-name">---</p>
-        <p class="term-desc">Ha tomado control total del sistema.</p>
         <button class="term-btn btn-main" onclick="returnToLobby()">[ RETORNO AL LOBBY ]</button>
       </div>
     </div>
