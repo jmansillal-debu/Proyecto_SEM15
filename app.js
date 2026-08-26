@@ -1,4 +1,3 @@
-// CONFIGURACIÓN DE FIREBASE (FORMATO COMPAT DE CDN)
 const firebaseConfig = {
   apiKey: "AIzaSyD3ENYHqV1eFLPUMAc6HnusYG7-6S-iyqg",
   authDomain: "proyectouno-84196.firebaseapp.com",
@@ -6,8 +5,7 @@ const firebaseConfig = {
   projectId: "proyectouno-84196",
   storageBucket: "proyectouno-84196.firebasestorage.app",
   messagingSenderId: "926454626159",
-  appId: "1:926454626159:web:f1cfb4836a810ac1a91a9a",
-  measurementId: "G-V966LGLNZB"
+  appId: "1:926454626159:web:f1cfb4836a810ac1a91a9a"
 };
 
 let db = null;
@@ -32,12 +30,15 @@ let roomRef = null;
 let chatRef = null;
 let currentGameState = null;
 
-// CONTADORES DE CLICS PARA MASCOTAS (REQUERIMIENTO: 40 CLICS)
 let llamaClicks = 0;
 let loroClicks = 0;
 
+let turnTimer = null;
+let timeLeft = 10;
+let pendingWildCard = null;
+
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
-const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '+4', '+6', '+8', '🚫', '🔄'];
+const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '+4', '🚫', '🔄'];
 
 function initHistory() {
   if (isFirebaseConnected && db) {
@@ -49,7 +50,7 @@ function initHistory() {
         Object.values(snapshot.val()).reverse().forEach(item => {
           list.innerHTML += `<li><b>${item.name}</b> [${item.date}]</li>`;
         });
-      } else { list.innerHTML = '<li class="empty-msg">Sin registro de victorias.</li>'; }
+      } else { list.innerHTML = '<li class="empty-msg">Sin registro.</li>'; }
     });
 
     db.ref('history/players').on('value', snapshot => {
@@ -62,12 +63,6 @@ function initHistory() {
         });
       } else { list.innerHTML = '<li class="empty-msg">Sin datos.</li>'; }
     });
-  }
-}
-
-function savePlayerRegistration(name, skill) {
-  if (isFirebaseConnected && db) {
-    db.ref('history/players').push({ name, skill, date: new Date().toLocaleTimeString() });
   }
 }
 
@@ -93,8 +88,19 @@ function getPlayerName() {
   const input = document.getElementById('player-name-input').value.trim();
   if (!input) { alert('ERROR: Ingrese un ID válido.'); return null; }
   myPlayerName = input;
-  savePlayerRegistration(myPlayerName, selectedSkill);
   return myPlayerName;
+}
+
+function generateDeck() {
+  let deck = [];
+  COLORS.forEach(color => {
+    VALUES.forEach(val => {
+      deck.push({ color, value: val, id: Math.random().toString(36).substr(2, 9) });
+    });
+  });
+  deck.push({ color: 'negro', value: '+4', id: Math.random().toString(36).substr(2, 9) });
+  deck.push({ color: 'negro', value: 'CAMBIO', id: Math.random().toString(36).substr(2, 9) });
+  return deck.sort(() => Math.random() - 0.5);
 }
 
 function createRoom() {
@@ -113,14 +119,12 @@ function createRoom() {
   if (isFirebaseConnected && db) {
     roomRef = db.ref('rooms/' + code);
     roomRef.set(initialData).then(() => { listenToRoom(); showScreen('screen-lobby'); });
-  } else { startLocalRoom(initialData); }
-}
-
-function startLocalRoom(data) {
-  currentGameState = data;
-  document.getElementById('lobby-code-display').innerText = currentRoomCode;
-  updateUI();
-  showScreen('screen-lobby');
+  } else {
+    currentGameState = initialData;
+    document.getElementById('lobby-code-display').innerText = currentRoomCode;
+    updateUI();
+    showScreen('screen-lobby');
+  }
 }
 
 function joinRoom() {
@@ -132,22 +136,12 @@ function joinRoom() {
   if (isFirebaseConnected && db) {
     roomRef = db.ref('rooms/' + code);
     roomRef.once('value', snapshot => {
-      if (!snapshot.exists()) return alert('Error: Sala inexistente.');
+      if (!snapshot.exists()) return alert('Error: Sala no encontrada.');
       roomRef.child('players/' + myPlayerId).set({
         id: myPlayerId, name: myPlayerName, avatar: selectedAvatarUrl, skill: selectedSkill, hand: [], isHost: false
       }).then(() => { listenToRoom(); showScreen('screen-lobby'); });
     });
   }
-}
-
-function generateDeck() {
-  let deck = [];
-  COLORS.forEach(color => {
-    VALUES.forEach(val => {
-      deck.push({ color, value: val, id: Math.random().toString(36).substr(2, 9) });
-    });
-  });
-  return deck.sort(() => Math.random() - 0.5);
 }
 
 function listenToRoom() {
@@ -159,13 +153,6 @@ function listenToRoom() {
       updateUI();
     });
   }
-  if (isFirebaseConnected && db) {
-    chatRef = db.ref('chats/' + currentRoomCode);
-    chatRef.off();
-    chatRef.on('child_added', snapshot => {
-      if (snapshot.exists()) renderL4DMessage(snapshot.val());
-    });
-  }
 }
 
 function startGame() {
@@ -175,11 +162,16 @@ function startGame() {
   let players = { ...currentGameState.players };
 
   playerKeys.forEach(pId => { players[pId].hand = deck.splice(0, 7); });
+  
   let topCard = deck.pop();
+  while(topCard.color === 'negro') {
+    deck.unshift(topCard);
+    topCard = deck.pop();
+  }
 
   const updatedState = {
     ...currentGameState, status: 'playing', deck: deck, players: players, topCard: topCard,
-    activeColor: topCard.color !== 'negro' ? topCard.color : 'rojo', turnOrder: playerKeys, currentTurnIndex: 0
+    activeColor: topCard.color, turnOrder: playerKeys, currentTurnIndex: 0, stack: 0
   };
 
   if (roomRef) roomRef.update(updatedState);
@@ -198,7 +190,26 @@ function updateUI() {
   } else if (currentGameState.status === 'playing') {
     showScreen('screen-game');
     renderGameBoard();
+    startTurnTimer();
   }
+}
+
+function startTurnTimer() {
+  clearInterval(turnTimer);
+  timeLeft = 10;
+  document.getElementById('timer-display').innerText = timeLeft;
+
+  turnTimer = setInterval(() => {
+    timeLeft--;
+    document.getElementById('timer-display').innerText = timeLeft;
+    if (timeLeft <= 0) {
+      clearInterval(turnTimer);
+      const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
+      if (activePlayerId === myPlayerId) {
+        drawCardCurrentPlayer();
+      }
+    }
+  }, 1000);
 }
 
 function renderGameBoard() {
@@ -209,7 +220,6 @@ function renderGameBoard() {
   document.getElementById('active-color-indicator').className = 'color-badge c-' + currentGameState.activeColor;
   document.getElementById('stack-display').innerText = '+' + (currentGameState.stack || 0);
 
-  // MESA CENTRAL
   const topCardSpot = document.getElementById('top-card');
   if (topCardSpot && currentGameState.topCard) {
     topCardSpot.className = `cyber-card c-${currentGameState.topCard.color}`;
@@ -223,7 +233,6 @@ function renderGameBoard() {
   renderMyHand(isMyTurn);
 }
 
-// RENDERIZADO DE OPONENTES COMPACTO CON CARTAS VISIBLES DERSO
 function renderOpponents(turnPlayerId) {
   const container = document.getElementById('opponents-zone');
   if (!container) return;
@@ -246,7 +255,7 @@ function renderOpponents(turnPlayerId) {
       <img src="${player.avatar}" class="opp-avatar">
       <div class="opp-info">
         <span class="opp-name">${player.name}</span>
-        <div class="opp-cards-fan">${cardsBackHTML} (${cardCount})</div>
+        <div class="opp-cards-fan">${cardsBackHTML} <span style="font-size:0.65rem; margin-left:8px; color:#94a3b8;">(${cardCount})</span></div>
       </div>
     `;
     container.appendChild(oppEl);
@@ -274,19 +283,127 @@ function renderMyHand(isMyTurn) {
   });
 }
 
-// LÓGICA DE CLICS EN MASCOTAS (exactamente 40 clics)
+// CORRECCIÓN PRINCIPAL: COLOCACIÓN Y VALIDACIÓN DE CARTAS
+function playCard(card) {
+  const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
+  if (activePlayerId !== myPlayerId) return;
+
+  const topCard = currentGameState.topCard;
+  const stack = currentGameState.stack || 0;
+
+  // Lógica de validación si existe un stack activo de suma (+2 / +4)
+  if (stack > 0) {
+    if (card.value !== '+2' && card.value !== '+4') {
+      alert(`¡Hay una acumulación activa de +${stack}! Debes responder con +2 o +4, o robar.`);
+      return;
+    }
+  }
+
+  // Validación regular de carta
+  const isValid = card.color === 'negro' || card.color === currentGameState.activeColor || card.value === topCard.value;
+  if (!isValid) {
+    alert('Esta carta no se puede jugar sobre la mesa.');
+    return;
+  }
+
+  // Remover carta de la mano
+  let myHand = currentGameState.players[myPlayerId].hand.filter(c => c.id !== card.id);
+  currentGameState.players[myPlayerId].hand = myHand;
+
+  // Si se juega una carta comodín negra
+  if (card.color === 'negro') {
+    pendingWildCard = card;
+    document.getElementById('color-modal').classList.remove('hidden');
+    return;
+  }
+
+  executeCardEffect(card);
+}
+
+function selectColor(color) {
+  document.getElementById('color-modal').classList.add('hidden');
+  if (pendingWildCard) {
+    let card = pendingWildCard;
+    pendingWildCard = null;
+    currentGameState.activeColor = color;
+    executeCardEffect(card);
+  }
+}
+
+function executeCardEffect(card) {
+  currentGameState.topCard = card;
+  if (card.color !== 'negro') {
+    currentGameState.activeColor = card.color;
+  }
+
+  // Efectos especiales
+  if (card.value === '+2') currentGameState.stack = (currentGameState.stack || 0) + 2;
+  if (card.value === '+4') currentGameState.stack = (currentGameState.stack || 0) + 4;
+
+  let skipTurn = false;
+  if (card.value === '🚫') skipTurn = true;
+  if (card.value === '🔄') currentGameState.turnOrder.reverse();
+
+  // Verificar Ganador
+  if (currentGameState.players[myPlayerId].hand.length === 0) {
+    currentGameState.status = 'finished';
+    currentGameState.winnerName = myPlayerName;
+    document.getElementById('winner-name-display').innerText = myPlayerName;
+    document.getElementById('winner-modal').classList.remove('hidden');
+  }
+
+  // Siguiente Turno
+  nextTurn(skipTurn);
+}
+
+function nextTurn(skip = false) {
+  let step = skip ? 2 : 1;
+  currentGameState.currentTurnIndex = (currentGameState.currentTurnIndex + step) % currentGameState.turnOrder.length;
+
+  if (roomRef) {
+    roomRef.set(currentGameState);
+  } else {
+    updateUI();
+  }
+}
+
+function drawCardCurrentPlayer() {
+  const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
+  if (activePlayerId !== myPlayerId) return;
+
+  let deck = [...currentGameState.deck];
+  if (deck.length === 0) deck = generateDeck();
+
+  let myHand = [...currentGameState.players[myPlayerId].hand];
+  const stack = currentGameState.stack || 0;
+
+  if (stack > 0) {
+    for (let i = 0; i < stack; i++) {
+      if (deck.length > 0) myHand.push(deck.pop());
+    }
+    currentGameState.stack = 0;
+  } else {
+    if (deck.length > 0) myHand.push(deck.pop());
+  }
+
+  currentGameState.deck = deck;
+  currentGameState.players[myPlayerId].hand = myHand;
+
+  nextTurn();
+}
+
+// FUNCIONALIDAD MASCOTAS
 function handleLlamaClick() {
   llamaClicks++;
   document.getElementById('llama-clicks').innerText = llamaClicks;
   if (llamaClicks >= 40) {
     llamaClicks = 0;
     document.getElementById('llama-clicks').innerText = 0;
-    let myHand = [...(currentGameState?.players[myPlayerId]?.hand || [])];
-    myHand.push({ color: 'negro', value: '+2', id: Math.random().toString(36).substr(2, 9) });
-
-    if (roomRef) roomRef.child(`players/${myPlayerId}/hand`).set(myHand);
-    else { currentGameState.players[myPlayerId].hand = myHand; updateUI(); }
-    sendL4DMessage('SISTEMA', `🦙 ¡Dron Llama completó 40 impactos y otorgó +1 carta a ${myPlayerName}!`);
+    if (currentGameState?.players[myPlayerId]) {
+      currentGameState.players[myPlayerId].hand.push({ color: 'negro', value: '+2', id: Math.random().toString(36).substr(2, 9) });
+      if (roomRef) roomRef.child(`players/${myPlayerId}/hand`).set(currentGameState.players[myPlayerId].hand);
+      else updateUI();
+    }
   }
 }
 
@@ -296,54 +413,35 @@ function handleGoodPetClick() {
   if (loroClicks >= 40) {
     loroClicks = 0;
     document.getElementById('loro-clicks').innerText = 0;
-    let myHand = [...(currentGameState?.players[myPlayerId]?.hand || [])];
-
-    if (myHand.length <= 1) {
-      sendL4DMessage('SISTEMA', `🦜 ¡${myPlayerName} intentó purgar su última carta con el Loro! Penalización +4.`);
-      for (let i = 0; i < 4; i++) {
-        myHand.push({ color: COLORS[i % 4], value: `${i + 1}`, id: Math.random().toString(36).substr(2, 9) });
-      }
-    } else {
-      myHand.pop();
-      sendL4DMessage('SISTEMA', `🦜 ¡Dron Loro completó 40 impactos y purgó 1 carta de ${myPlayerName}!`);
+    let hand = currentGameState?.players[myPlayerId]?.hand;
+    if (hand && hand.length > 1) {
+      hand.pop();
+      if (roomRef) roomRef.child(`players/${myPlayerId}/hand`).set(hand);
+      else updateUI();
     }
-
-    if (roomRef) roomRef.child(`players/${myPlayerId}/hand`).set(myHand);
-    else { currentGameState.players[myPlayerId].hand = myHand; updateUI(); }
   }
 }
 
-// MOVIMIENTO LENTO Y FLUIDO POR TODA LA PANTALLA
 function initRoamingPets() {
   const badPet = document.getElementById('bad-pet');
   const goodPet = document.getElementById('good-pet');
 
   function movePet(petEl) {
     if (!petEl) return;
-    const maxX = window.innerWidth - 100;
-    const maxY = window.innerHeight - 100;
-    const randomX = Math.floor(Math.random() * maxX);
-    const randomY = Math.floor(Math.random() * maxY);
-    petEl.style.left = `${randomX}px`;
-    petEl.style.top = `${randomY}px`;
+    const maxX = window.innerWidth - 120;
+    const maxY = window.innerHeight - 120;
+    petEl.style.left = `${Math.floor(Math.random() * maxX)}px`;
+    petEl.style.top = `${Math.floor(Math.random() * maxY)}px`;
   }
 
-  setInterval(() => movePet(badPet), 4000);
-  setInterval(() => movePet(goodPet), 5000);
+  setInterval(() => movePet(badPet), 4500);
+  setInterval(() => movePet(goodPet), 5500);
 }
 
 function useSpecialSkill() {
   if (hasUsedSkill) return alert('Habilidad agotada.');
   hasUsedSkill = true;
-
-  if (selectedSkill === 'Escudo Táctico') {
-    currentGameState.stack = 0;
-    sendL4DMessage('HABILIDAD', `¡${myPlayerName} desplegó Escudo Táctico!`);
-  } else if (selectedSkill === 'Robo Rápido') {
-    let myHand = currentGameState.players[myPlayerId].hand;
-    myHand.push({ color: 'negro', value: '+4', id: Math.random().toString(36).substr(2, 9) });
-    sendL4DMessage('HABILIDAD', `¡${myPlayerName} ejecutó Inyección de Suma (+4)!`);
-  }
+  if (selectedSkill === 'Escudo Táctico') currentGameState.stack = 0;
   updateUI();
 }
 
@@ -351,15 +449,10 @@ function handleChatKey(event) {
   if (event.key === 'Enter') {
     const input = document.getElementById('l4d-chat-input');
     if (input.value.trim()) {
-      sendL4DMessage(myPlayerName, input.value.trim());
+      renderL4DMessage({ sender: myPlayerName, text: input.value.trim() });
       input.value = '';
     }
   }
-}
-
-function sendL4DMessage(sender, text) {
-  if (chatRef) chatRef.push({ sender, text });
-  else renderL4DMessage({ sender, text });
 }
 
 function renderL4DMessage(msgData) {
