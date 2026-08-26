@@ -27,7 +27,6 @@ let hasUsedSkill = false;
 
 let currentRoomCode = null;
 let roomRef = null;
-let chatRef = null;
 let currentGameState = null;
 
 let llamaClicks = 0;
@@ -68,7 +67,6 @@ function initHistory() {
 
 document.addEventListener('DOMContentLoaded', () => { 
   initHistory();
-  initRoamingPets();
 });
 
 function selectAvatar(element, url, skillName, skillDesc) {
@@ -76,17 +74,26 @@ function selectAvatar(element, url, skillName, skillDesc) {
   element.classList.add('selected');
   selectedAvatarUrl = url;
   selectedSkill = skillName;
-  document.getElementById('skill-description').innerText = '> Habilidad: ' + skillDesc;
+  document.getElementById('skill-description').innerText = 'Habilidad: ' + skillDesc;
 }
 
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(screenId)?.classList.add('active');
+
+  // CONTROL DE VISIBILIDAD DE MASCOTAS
+  const petsLayer = document.getElementById('pets-roaming-layer');
+  if (screenId === 'screen-game') {
+    petsLayer.classList.remove('pets-hidden');
+    initRoamingPets();
+  } else {
+    petsLayer.classList.add('pets-hidden');
+  }
 }
 
 function getPlayerName() {
   const input = document.getElementById('player-name-input').value.trim();
-  if (!input) { alert('ERROR: Ingrese un ID válido.'); return null; }
+  if (!input) { alert('Por favor, ingresa tu nombre.'); return null; }
   myPlayerName = input;
   return myPlayerName;
 }
@@ -136,7 +143,7 @@ function joinRoom() {
   if (isFirebaseConnected && db) {
     roomRef = db.ref('rooms/' + code);
     roomRef.once('value', snapshot => {
-      if (!snapshot.exists()) return alert('Error: Sala no encontrada.');
+      if (!snapshot.exists()) return alert('Sala no encontrada.');
       roomRef.child('players/' + myPlayerId).set({
         id: myPlayerId, name: myPlayerName, avatar: selectedAvatarUrl, skill: selectedSkill, hand: [], isHost: false
       }).then(() => { listenToRoom(); showScreen('screen-lobby'); });
@@ -185,7 +192,7 @@ function updateUI() {
     showScreen('screen-lobby');
     const playersArr = Object.values(currentGameState.players || {});
     document.getElementById('player-count').innerText = playersArr.length;
-    document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `<li>> <b>${p.name}</b> (${p.skill})</li>`).join('');
+    document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `<li><b>${p.name}</b> (${p.skill})</li>`).join('');
     document.getElementById('btn-start-game').style.display = currentGameState.host === myPlayerId ? 'block' : 'none';
   } else if (currentGameState.status === 'playing') {
     showScreen('screen-game');
@@ -222,7 +229,7 @@ function renderGameBoard() {
 
   const topCardSpot = document.getElementById('top-card');
   if (topCardSpot && currentGameState.topCard) {
-    topCardSpot.className = `cyber-card c-${currentGameState.topCard.color}`;
+    topCardSpot.className = `uno-card c-${currentGameState.topCard.color}`;
     topCardSpot.innerHTML = `
       <span class="card-corner">${currentGameState.topCard.value}</span>
       <div class="card-inner">${currentGameState.topCard.value}</div>
@@ -243,19 +250,14 @@ function renderOpponents(turnPlayerId) {
 
     const isTurn = player.id === turnPlayerId;
     const cardCount = player.hand ? player.hand.length : 0;
-    
-    let cardsBackHTML = '';
-    for(let i = 0; i < Math.min(cardCount, 8); i++) {
-      cardsBackHTML += `<div class="opp-card-back"></div>`;
-    }
 
     const oppEl = document.createElement('div');
     oppEl.className = `opponent-mini-card ${isTurn ? 'active-turn' : ''}`;
     oppEl.innerHTML = `
       <img src="${player.avatar}" class="opp-avatar">
-      <div class="opp-info">
-        <span class="opp-name">${player.name}</span>
-        <div class="opp-cards-fan">${cardsBackHTML} <span style="font-size:0.65rem; margin-left:8px; color:#94a3b8;">(${cardCount})</span></div>
+      <div>
+        <div class="opp-name">${player.name}</div>
+        <div style="font-size:0.7rem; color:var(--text-muted);">${cardCount} cartas</div>
       </div>
     `;
     container.appendChild(oppEl);
@@ -273,7 +275,7 @@ function renderMyHand(isMyTurn) {
 
   myData.hand.forEach((card) => {
     const cardEl = document.createElement('div');
-    cardEl.className = `cyber-card c-${card.color}`;
+    cardEl.className = `uno-card c-${card.color}`;
     cardEl.innerHTML = `
       <span class="card-corner">${card.value}</span>
       <div class="card-inner">${card.value}</div>
@@ -283,7 +285,6 @@ function renderMyHand(isMyTurn) {
   });
 }
 
-// CORRECCIÓN PRINCIPAL: COLOCACIÓN Y VALIDACIÓN DE CARTAS
 function playCard(card) {
   const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
   if (activePlayerId !== myPlayerId) return;
@@ -291,7 +292,6 @@ function playCard(card) {
   const topCard = currentGameState.topCard;
   const stack = currentGameState.stack || 0;
 
-  // Lógica de validación si existe un stack activo de suma (+2 / +4)
   if (stack > 0) {
     if (card.value !== '+2' && card.value !== '+4') {
       alert(`¡Hay una acumulación activa de +${stack}! Debes responder con +2 o +4, o robar.`);
@@ -299,18 +299,15 @@ function playCard(card) {
     }
   }
 
-  // Validación regular de carta
   const isValid = card.color === 'negro' || card.color === currentGameState.activeColor || card.value === topCard.value;
   if (!isValid) {
-    alert('Esta carta no se puede jugar sobre la mesa.');
+    alert('Esta carta no coincide con el color o valor de la mesa.');
     return;
   }
 
-  // Remover carta de la mano
   let myHand = currentGameState.players[myPlayerId].hand.filter(c => c.id !== card.id);
   currentGameState.players[myPlayerId].hand = myHand;
 
-  // Si se juega una carta comodín negra
   if (card.color === 'negro') {
     pendingWildCard = card;
     document.getElementById('color-modal').classList.remove('hidden');
@@ -336,7 +333,6 @@ function executeCardEffect(card) {
     currentGameState.activeColor = card.color;
   }
 
-  // Efectos especiales
   if (card.value === '+2') currentGameState.stack = (currentGameState.stack || 0) + 2;
   if (card.value === '+4') currentGameState.stack = (currentGameState.stack || 0) + 4;
 
@@ -344,7 +340,6 @@ function executeCardEffect(card) {
   if (card.value === '🚫') skipTurn = true;
   if (card.value === '🔄') currentGameState.turnOrder.reverse();
 
-  // Verificar Ganador
   if (currentGameState.players[myPlayerId].hand.length === 0) {
     currentGameState.status = 'finished';
     currentGameState.winnerName = myPlayerName;
@@ -352,7 +347,6 @@ function executeCardEffect(card) {
     document.getElementById('winner-modal').classList.remove('hidden');
   }
 
-  // Siguiente Turno
   nextTurn(skipTurn);
 }
 
@@ -360,11 +354,8 @@ function nextTurn(skip = false) {
   let step = skip ? 2 : 1;
   currentGameState.currentTurnIndex = (currentGameState.currentTurnIndex + step) % currentGameState.turnOrder.length;
 
-  if (roomRef) {
-    roomRef.set(currentGameState);
-  } else {
-    updateUI();
-  }
+  if (roomRef) roomRef.set(currentGameState);
+  else updateUI();
 }
 
 function drawCardCurrentPlayer() {
@@ -392,7 +383,24 @@ function drawCardCurrentPlayer() {
   nextTurn();
 }
 
-// FUNCIONALIDAD MASCOTAS
+// MASCOTAS - MOVIMIENTO ÚNICAMENTE VERTICAL (ARRIBA Y ABAJO)
+let petInterval = null;
+function initRoamingPets() {
+  if (petInterval) clearInterval(petInterval);
+
+  const badPet = document.getElementById('bad-pet');
+  const goodPet = document.getElementById('good-pet');
+
+  function movePetsVertical() {
+    const maxY = window.innerHeight - 100;
+    if (badPet) badPet.style.top = `${Math.floor(Math.random() * maxY)}px`;
+    if (goodPet) goodPet.style.top = `${Math.floor(Math.random() * maxY)}px`;
+  }
+
+  movePetsVertical();
+  petInterval = setInterval(movePetsVertical, 3500);
+}
+
 function handleLlamaClick() {
   llamaClicks++;
   document.getElementById('llama-clicks').innerText = llamaClicks;
@@ -422,24 +430,8 @@ function handleGoodPetClick() {
   }
 }
 
-function initRoamingPets() {
-  const badPet = document.getElementById('bad-pet');
-  const goodPet = document.getElementById('good-pet');
-
-  function movePet(petEl) {
-    if (!petEl) return;
-    const maxX = window.innerWidth - 120;
-    const maxY = window.innerHeight - 120;
-    petEl.style.left = `${Math.floor(Math.random() * maxX)}px`;
-    petEl.style.top = `${Math.floor(Math.random() * maxY)}px`;
-  }
-
-  setInterval(() => movePet(badPet), 4500);
-  setInterval(() => movePet(goodPet), 5500);
-}
-
 function useSpecialSkill() {
-  if (hasUsedSkill) return alert('Habilidad agotada.');
+  if (hasUsedSkill) return alert('Habilidad ya utilizada.');
   hasUsedSkill = true;
   if (selectedSkill === 'Escudo Táctico') currentGameState.stack = 0;
   updateUI();
