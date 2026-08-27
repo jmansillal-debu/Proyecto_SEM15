@@ -37,6 +37,12 @@ let turnTimer = null;
 let timeLeft = 10;
 let pendingWildCard = null;
 
+// WEBRTC CHAT DE VOZ (MICRÓFONO EN TIEMPO REAL)
+let localStream = null;
+let isMicOn = false;
+let peerConnections = {};
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '+4', '🚫', '🔄'];
 
@@ -128,6 +134,7 @@ function createRoom() {
     roomRef.set(initialData).then(() => { 
       listenToRoom(); 
       listenToChat();
+      initVoiceSignaling();
       showScreen('screen-lobby'); 
     });
   } else {
@@ -153,6 +160,7 @@ function joinRoom() {
       }).then(() => { 
         listenToRoom(); 
         listenToChat();
+        initVoiceSignaling();
         showScreen('screen-lobby'); 
       });
     });
@@ -170,7 +178,6 @@ function listenToRoom() {
   }
 }
 
-// ARREGLO DEL CHAT EN TIEMPO REAL MULTIJUGADOR
 function listenToChat() {
   if (!currentRoomCode || !isFirebaseConnected || !db) return;
   chatRef = db.ref('chats/' + currentRoomCode);
@@ -207,6 +214,87 @@ function renderL4DMessage(msgData) {
   msgEl.innerHTML = `<b>${msgData.sender}:</b> ${msgData.text}`;
   container.appendChild(msgEl);
   container.scrollTop = container.scrollHeight;
+}
+
+// FUNCIONAMIENTO COMPLETO DE CHAT DE VOZ Y MICRÓFONO
+async function toggleMicrophone() {
+  const btn = document.getElementById('btn-mic-toggle');
+  const text = document.getElementById('mic-status-text');
+  
+  if (!isMicOn) {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      isMicOn = true;
+      btn.className = 'ui-btn btn-mic-on';
+      text.innerText = 'Micrófono Encendido';
+      
+      // Adjuntar stream de voz local a conexiones pares
+      Object.keys(peerConnections).forEach(pId => {
+        localStream.getTracks().forEach(track => peerConnections[pId].addTrack(track, localStream));
+      });
+    } catch (err) {
+      alert('No se pudo activar el micrófono. Por favor permite los permisos del navegador.');
+    }
+  } else {
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+    isMicOn = false;
+    btn.className = 'ui-btn btn-mic-off';
+    text.innerText = 'Micrófono Apagado';
+  }
+}
+
+function initVoiceSignaling() {
+  if (!isFirebaseConnected || !db || !currentRoomCode) return;
+  const signalRef = db.ref(`signals/${currentRoomCode}/${myPlayerId}`);
+  
+  signalRef.on('child_added', async snapshot => {
+    const data = snapshot.val();
+    const fromId = data.from;
+    
+    if (!peerConnections[fromId]) createPeerConnection(fromId);
+    const pc = peerConnections[fromId];
+
+    if (data.offer) {
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      db.ref(`signals/${currentRoomCode}/${fromId}`).push({ from: myPlayerId, answer: answer });
+    } else if (data.answer) {
+      await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+    } else if (data.candidate) {
+      await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+  });
+}
+
+function createPeerConnection(targetPlayerId) {
+  const pc = new RTCPeerConnection(rtcConfig);
+  peerConnections[targetPlayerId] = pc;
+
+  if (localStream) {
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  }
+
+  pc.onicecandidate = event => {
+    if (event.candidate) {
+      db.ref(`signals/${currentRoomCode}/${targetPlayerId}`).push({ from: myPlayerId, candidate: event.candidate });
+    }
+  };
+
+  pc.ontrack = event => {
+    let audio = document.getElementById(`audio_${targetPlayerId}`);
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = `audio_${targetPlayerId}`;
+      audio.autoplay = true;
+      document.body.appendChild(audio);
+    }
+    audio.srcObject = event.streams[0];
+  };
+
+  return pc;
 }
 
 function startGame() {
@@ -251,7 +339,6 @@ function updateUI() {
     renderGameBoard();
     startTurnTimer();
   } else if (currentGameState.status === 'finished') {
-    // SINCRONIZACIÓN DE MODAL DE VICTORIA PARA TODOS LOS JUGADORES
     document.getElementById('winner-name-display').innerText = currentGameState.winnerName || 'Ganador Desconocido';
     document.getElementById('winner-modal').classList.remove('hidden');
     clearInterval(turnTimer);
@@ -293,18 +380,25 @@ function renderGameBoard() {
     `;
   }
 
-  renderOpponents(turnPlayerId);
+  renderOpponentsQuadrant(turnPlayerId);
   renderMyHand(isMyTurn);
 }
 
-function renderOpponents(turnPlayerId) {
-  const container = document.getElementById('opponents-zone');
-  if (!container) return;
-  container.innerHTML = '';
+// DISTRIBUCIÓN ADAPTATIVA DE JUGADORES EN CUADRANTE (2 IZQ, 2 DER, RESTO ARRIBA)
+function renderOpponentsQuadrant(turnPlayerId) {
+  const zoneTop = document.getElementById('opponents-top');
+  const zoneLeft = document.getElementById('opponents-left');
+  const zoneRight = document.getElementById('opponents-right');
 
-  Object.values(currentGameState.players || {}).forEach(player => {
-    if (player.id === myPlayerId) return;
+  if (!zoneTop || !zoneLeft || !zoneRight) return;
+  
+  zoneTop.innerHTML = '';
+  zoneLeft.innerHTML = '';
+  zoneRight.innerHTML = '';
 
+  const opponents = Object.values(currentGameState.players || {}).filter(p => p.id !== myPlayerId);
+
+  opponents.forEach((player, index) => {
     const isTurn = player.id === turnPlayerId;
     const cardCount = player.hand ? player.hand.length : 0;
 
@@ -312,12 +406,15 @@ function renderOpponents(turnPlayerId) {
     oppEl.className = `opponent-mini-card ${isTurn ? 'active-turn' : ''}`;
     oppEl.innerHTML = `
       <img src="${player.avatar}" class="opp-avatar">
-      <div class="text-center">
+      <div class="text-center" style="width:100%;">
         <div class="opp-name">${player.name}</div>
-        <div style="font-size:0.72rem; color:var(--text-muted);">${cardCount} cartas</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">${cardCount} cartas</div>
       </div>
     `;
-    container.appendChild(oppEl);
+
+    if (index === 0) zoneLeft.appendChild(oppEl);
+    else if (index === 1) zoneRight.appendChild(oppEl);
+    else zoneTop.appendChild(oppEl);
   });
 }
 
@@ -476,7 +573,7 @@ function returnToLobby() {
   }
 }
 
-// MOVIMIENTO EXCLUSIVAMENTE VERTICAL DE MASCOTAS
+// MOVIMIENTO DE MASCOTAS
 let petInterval = null;
 function initRoamingPets() {
   if (petInterval) clearInterval(petInterval);
