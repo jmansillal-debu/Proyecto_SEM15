@@ -7,14 +7,14 @@
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
-  <!-- CAPA DE MASCOTAS (MOVIMIENTO SOLO VERTICAL) -->
+  <!-- CAPA DE MASCOTAS -->
   <div id="pets-roaming-layer" class="pets-hidden">
     <div id="bad-pet" class="roaming-pet" onclick="handleLlamaClick()">
       <div class="pet-tooltip text-center">🦙 LLAMA TRAICIONERA<br><span id="llama-clicks">0</span>/40 (+1 Carta Extra)</div>
@@ -50,7 +50,7 @@
       <main class="main-card text-center">
         <div class="brand-header text-center">
           <h1>UNO CLASH</h1>
-          <p>¡Compite en tiempo real, usa habilidades únicas y domina la mesa de cartas!</p>
+          <p>¡Compite en tiempo real, habla por micrófono y domina la mesa de cartas!</p>
         </div>
         
         <div class="form-group text-center">
@@ -130,10 +130,12 @@
 
   <!-- PANTALLA DE JUEGO -->
   <div id="screen-game" class="screen">
-    <div class="game-layout">
+    <div class="game-arena-grid">
 
-      <!-- OPONENTES -->
-      <header id="opponents-zone" class="opponents-bar text-center"></header>
+      <!-- ZONAS ADAPTATIVAS DE OPONENTES -->
+      <div id="opponents-top" class="opponents-zone zone-top text-center"></div>
+      <div id="opponents-left" class="opponents-zone zone-left text-center"></div>
+      <div id="opponents-right" class="opponents-zone zone-right text-center"></div>
 
       <!-- MESA CENTRAL -->
       <main class="table-zone text-center">
@@ -167,9 +169,17 @@
         </div>
       </main>
 
-      <!-- CHAT GLOBAL DE LA SALA -->
+      <!-- CHAT GLOBAL Y MICRÓFONO EN VIVO -->
       <div id="l4d-chat-container" class="side-card game-chat">
-        <div class="card-header text-center">CHAT EN VIVO</div>
+        <div class="card-header text-center">CHAT & MICRÓFONO</div>
+        
+        <!-- PANEL DE MICRÓFONO EN TIEMPO REAL -->
+        <div class="mic-panel text-center">
+          <button id="btn-mic-toggle" class="ui-btn btn-mic-off" onclick="toggleMicrophone()">
+            <span id="mic-icon">🎤</span> <span id="mic-status-text">Micrófono Apagado</span>
+          </button>
+        </div>
+
         <div id="l4d-chat-messages" class="chat-logs"></div>
         <input type="text" id="l4d-chat-input" class="ui-input chat-in" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
       </div>
