@@ -38,7 +38,7 @@ let turnTimer = null;
 let timeLeft = 10;
 let pendingWildCard = null;
 
-// WEBRTC CHAT DE VOZ
+// WEBRTC CHAT DE VOZ EN TIEMPO REAL
 let localStream = null;
 let isMicOn = false;
 let peerConnections = {};
@@ -47,7 +47,7 @@ const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '+4', '🚫', '🔄'];
 
-// NOTIFICACIÓN SI UN JUGADOR ABANDONA / RECARGA LA PÁGINA
+// DETECTAR ABANDONO DE NAVEGADOR
 window.addEventListener('beforeunload', () => {
   if (currentRoomCode && myPlayerName && isFirebaseConnected && db) {
     db.ref(`chats/${currentRoomCode}`).push({
@@ -200,7 +200,6 @@ function listenToRoom() {
       if (!snapshot.exists()) return;
       currentGameState = snapshot.val();
       
-      // DETECTAR JUGADORES DESCONECTADOS Y MOSTRAR NOTIFICACIÓN
       const activePlayers = currentGameState.players || {};
       Object.keys(knownPlayers).forEach(pId => {
         if (!activePlayers[pId]) {
@@ -230,7 +229,7 @@ function listenToChat() {
   });
 }
 
-// CHAT EN LA SALA DE ESPERA
+// CHAT SALA DE ESPERA
 function handleLobbyChatKey(event) {
   if (event.key === 'Enter') {
     const input = document.getElementById('lobby-chat-input');
@@ -281,7 +280,7 @@ function renderL4DMessage(msgData) {
   container.scrollTop = container.scrollHeight;
 }
 
-// CHAT DE VOZ Y MICRÓFONO
+// MICRÓFONO WEBRTC
 async function toggleMicrophone() {
   const btn = document.getElementById('btn-mic-toggle');
   const text = document.getElementById('mic-status-text');
@@ -297,7 +296,7 @@ async function toggleMicrophone() {
         localStream.getTracks().forEach(track => peerConnections[pId].addTrack(track, localStream));
       });
     } catch (err) {
-      alert('No se pudo activar el micrófono. Otorga permisos en el navegador.');
+      alert('No se pudo activar el micrófono. Concede los permisos necesarios.');
     }
   } else {
     if (localStream) {
@@ -392,7 +391,6 @@ function updateUI() {
     const playersArr = Object.values(currentGameState.players || {});
     document.getElementById('player-count').innerText = playersArr.length;
     
-    // RENDERIZADO DE JUGADORES EN EL LOBBY CON TARJETAS AGRANDADAS
     document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `
       <div class="lobby-player-card">
         <img src="${p.avatar}" class="lobby-player-avatar">
@@ -521,14 +519,14 @@ function playCard(card) {
 
   if (stack > 0) {
     if (card.value !== '+2' && card.value !== '+4') {
-      alert(`¡Existe un acumulado activo de +${stack}! Debes colocar una carta +2 o +4, o robar.`);
+      alert(`¡Hay un pozo acumulado de +${stack}! Juega una carta +2 o +4, o roba cartas.`);
       return;
     }
   }
 
   const isValid = card.color === 'negro' || card.color === currentGameState.activeColor || card.value === topCard.value;
   if (!isValid) {
-    alert('Esta carta no coincide con el color ni con el número de la mesa.');
+    alert('Esta carta no coincide con el color ni con el número actual.');
     return;
   }
 
@@ -625,7 +623,7 @@ function drawCardCurrentPlayer() {
 function sayUno() {
   const myHand = currentGameState?.players[myPlayerId]?.hand;
   if (myHand && myHand.length === 1) {
-    alert('¡Has gritado UNO exitosamente!');
+    alert('¡Cargado el grito de UNO correctamente!');
     if (isFirebaseConnected && db && currentRoomCode) {
       db.ref('chats/' + currentRoomCode).push({
         sender: 'SISTEMA',
@@ -633,7 +631,7 @@ function sayUno() {
       });
     }
   } else {
-    alert('¡Solo puedes cantar UNO cuando te quede 1 carta!');
+    alert('Solo puedes cantar UNO si te queda exactamente 1 carta.');
   }
 }
 
@@ -646,7 +644,7 @@ function returnToLobby() {
   }
 }
 
-// MASCOTAS
+// LÓGICA DE MASCOTAS
 let petInterval = null;
 function initRoamingPets() {
   if (petInterval) clearInterval(petInterval);
@@ -694,7 +692,7 @@ function handleGoodPetClick() {
 }
 
 function useSpecialSkill() {
-  if (hasUsedSkill) return alert('Ya has utilizado tu habilidad especial en esta partida.');
+  if (hasUsedSkill) return alert('Ya has usado la habilidad única en esta partida.');
   hasUsedSkill = true;
   if (selectedSkill === 'Escudo Táctico') currentGameState.stack = 0;
   if (roomRef) roomRef.child('stack').set(currentGameState.stack);
