@@ -363,7 +363,7 @@ function createPeerConnection(targetPlayerId) {
 function startGame() {
   if (!currentGameState) return;
   const playerKeys = Object.keys(currentGameState.players || {});
-  let deck = [...currentGameState.deck];
+  let deck = generateDeck();
   let players = { ...currentGameState.players };
 
   playerKeys.forEach(pId => { players[pId].hand = deck.splice(0, 7); });
@@ -373,6 +373,8 @@ function startGame() {
     deck.unshift(topCard);
     topCard = deck.pop();
   }
+
+  hasUsedSkill = false;
 
   const updatedState = {
     ...currentGameState, status: 'playing', deck: deck, players: players, topCard: topCard,
@@ -422,13 +424,14 @@ function startTurnTimer() {
   timeLeft = 10;
   document.getElementById('timer-display').innerText = timeLeft;
 
+  const turnPlayerId = currentGameState?.turnOrder ? currentGameState.turnOrder[currentGameState.currentTurnIndex] : null;
+
   turnTimer = setInterval(() => {
     timeLeft--;
     document.getElementById('timer-display').innerText = timeLeft;
     if (timeLeft <= 0) {
       clearInterval(turnTimer);
-      const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
-      if (activePlayerId === myPlayerId) {
+      if (turnPlayerId === myPlayerId) {
         drawCardCurrentPlayer();
       }
     }
@@ -439,7 +442,7 @@ function renderGameBoard() {
   const turnPlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
   const isMyTurn = turnPlayerId === myPlayerId;
 
-  document.getElementById('turn-display').innerText = isMyTurn ? '¡TU TURNO!' : currentGameState.players[turnPlayerId]?.name;
+  document.getElementById('turn-display').innerText = isMyTurn ? '¡TU TURNO!' : (currentGameState.players[turnPlayerId]?.name || '---');
   document.getElementById('active-color-indicator').className = 'color-badge c-' + currentGameState.activeColor;
   document.getElementById('stack-display').innerText = '+' + (currentGameState.stack || 0);
 
@@ -591,7 +594,7 @@ function nextTurn(skip = false) {
   let step = skip ? 2 : 1;
   currentGameState.currentTurnIndex = (currentGameState.currentTurnIndex + step) % currentGameState.turnOrder.length;
 
-  if (roomRef) roomRef.set(currentGameState);
+  if (roomRef) roomRef.update(currentGameState);
   else updateUI();
 }
 
