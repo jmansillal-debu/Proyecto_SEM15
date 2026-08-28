@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -32,7 +32,7 @@
     </div>
   </div>
 
-  <!-- MENU PRINCIPAL -->
+  <!-- PANTALLA 1: MENU PRINCIPAL -->
   <div id="screen-menu" class="screen active">
     <div class="app-layout">
       
@@ -40,15 +40,15 @@
         <div class="card-header text-center">REGLAS Y GUÍA DE JUEGO</div>
         <div class="info-item">
           <h4>Mecánica de Acumulación</h4>
-          <p>Encadena estratégicamente cartas +2 o +4. Si el oponente no puede responder en su turno, absorberá la suma total de cartas acumuladas en la mesa.</p>
+          <p>Encadena estratégicamente cartas +2 o +4. Si el oponente no responde, absorberá la suma total de cartas activas en la mesa.</p>
         </div>
         <div class="info-item">
           <h4>Interacción de Mascotas</h4>
-          <p>La Llama y el Loro se moverán verticalmente en la pantalla. Tócalos rápidamente hasta completar el medidor para descartar o sumar cartas en tu mano.</p>
+          <p>La Llama y el Loro se moverán verticalmente. Tócalos rápidamente para activar descartes o penalizaciones extra.</p>
         </div>
         <div class="info-item">
           <h4>Habilidades Únicas</h4>
-          <p>Cada avatar posee un poder táctico de un solo uso. Utilízalo en el momento crítico de la partida para revertir la situación a tu favor.</p>
+          <p>Cada avatar cuenta con un poder especial único por partida. Actívalo en el instante adecuado para inclinar la balanza.</p>
         </div>
       </aside>
 
@@ -109,14 +109,14 @@
     </div>
   </div>
 
-  <!-- PANTALLA DE LOBBY (CON CHAT INCORPORADO Y PERFILES AMPLIADOS) -->
+  <!-- PANTALLA 2: LOBBY DE ESPERA (CON CHAT INTEGRADO) -->
   <div id="screen-lobby" class="screen">
     <div class="lobby-layout-grid">
       
       <!-- CONTENEDOR PRINCIPAL DEL LOBBY -->
       <div class="main-card lobby-box text-center">
         <div class="card-header text-center">SALA DE ESPERA DIGITAL</div>
-        <p class="lobby-desc text-center">Comparte este código con tus amigos para ingresar a la misma partida.</p>
+        <p class="lobby-desc text-center">Comparte este código con tus amigos para unirse a la partida.</p>
         
         <div class="lobby-code-card text-center">
           <span class="form-label text-center">CÓDIGO DE SALA:</span>
@@ -146,16 +146,16 @@
     </div>
   </div>
 
-  <!-- PANTALLA DE JUEGO -->
+  <!-- PANTALLA 3: MESA DE JUEGO -->
   <div id="screen-game" class="screen">
     <div class="game-arena-grid">
 
-      <!-- ZONAS ADAPTATIVAS DE OPONENTES -->
+      <!-- OPONENTES -->
       <div id="opponents-top" class="opponents-zone zone-top text-center"></div>
       <div id="opponents-left" class="opponents-zone zone-left text-center"></div>
       <div id="opponents-right" class="opponents-zone zone-right text-center"></div>
 
-      <!-- MESA CENTRAL -->
+      <!-- TABLERO CENTRAL -->
       <main class="table-zone text-center">
         <div class="status-pill text-center">
           <div class="status-item">Turno: <span id="turn-display" class="val-highlight">---</span></div>
@@ -164,9 +164,9 @@
           <div class="status-item">Pozo: <span id="stack-display" class="val-highlight">+0</span></div>
         </div>
 
-        <!-- FOTO DENTRO DE LA PARTIDA DE TAMAÑO DESTACADO -->
+        <!-- FOTO PRINCIPAL DENTRO DE LA PARTIDA -->
         <div class="match-banner-container text-center">
-          <img src="./assets/foto1.jpeg" alt="Foto Partida" class="match-banner-img">
+          <img src="./assets/foto1.jpeg" alt="Estadio" class="match-banner-img">
           <span class="match-banner-tag">ESTADIO UNO CLASH</span>
         </div>
 
@@ -187,11 +187,10 @@
         </div>
       </main>
 
-      <!-- CHAT GLOBAL Y MICRÓFONO EN VIVO DENTRO DEL JUEGO -->
+      <!-- CHAT DEL JUEGO Y MICRÓFONO -->
       <div id="l4d-chat-container" class="side-card game-chat">
         <div class="card-header text-center">CHAT & MICRÓFONO</div>
         
-        <!-- PANEL DE MICRÓFONO EN TIEMPO REAL -->
         <div class="mic-panel text-center">
           <button id="btn-mic-toggle" class="ui-btn btn-mic-off" onclick="toggleMicrophone()">
             <span id="mic-icon">🎤</span> <span id="mic-status-text">Micrófono Apagado</span>
@@ -202,7 +201,7 @@
         <input type="text" id="l4d-chat-input" class="ui-input chat-in" placeholder="Escribe un mensaje..." onkeypress="handleChatKey(event)">
       </div>
 
-      <!-- ZONA DEL JUGADOR CON PERFIL AGRANDADO -->
+      <!-- PERFIL Y MANO DEL JUGADOR -->
       <footer class="player-zone text-center">
         <div class="my-profile-summary">
           <img id="my-avatar-display" src="./assets/foto1.jpeg" class="my-profile-avatar">
@@ -225,11 +224,11 @@
 
     </div>
 
-    <!-- MODAL SELECCIÓN COLOR -->
+    <!-- MODAL ELECCIÓN DE COLOR -->
     <div id="color-modal" class="modal hidden">
       <div class="modal-box text-center">
         <div class="card-header text-center">ELIGE UN COLOR</div>
-        <p class="modal-subtext text-center">Selecciona el nuevo color dominante en la partida.</p>
+        <p class="modal-subtext text-center">Selecciona el nuevo color que regirá la mesa.</p>
         <div class="color-grid">
           <button class="btn-color c-rojo" onclick="selectColor('rojo')">Rojo</button>
           <button class="btn-color c-azul" onclick="selectColor('azul')">Azul</button>
@@ -239,14 +238,14 @@
       </div>
     </div>
 
-    <!-- MODAL VICTORIA MEJORADO -->
+    <!-- MODAL VICTORIA -->
     <div id="winner-modal" class="modal hidden">
       <div class="modal-box victory-box text-center">
         <div class="victory-icon text-center">🏆</div>
         <h1 class="winner-title text-center">¡PARTIDA FINALIZADA!</h1>
-        <p class="victory-subtitle text-center">El ganador de la partida es:</p>
+        <p class="victory-subtitle text-center">El ganador es:</p>
         <div id="winner-name-display" class="winner-name text-center">---</div>
-        <p class="victory-desc text-center">¡Excelente partida a todos los competidores! Los resultados han sido guardados en el historial global.</p>
+        <p class="victory-desc text-center">¡Gran victoria! Los datos se han guardado en las estadísticas de la comunidad.</p>
         <button class="ui-btn btn-primary btn-block" onclick="returnToLobby()">Volver al Lobby</button>
       </div>
     </div>
