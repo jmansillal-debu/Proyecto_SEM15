@@ -29,6 +29,7 @@ let currentRoomCode = null;
 let roomRef = null;
 let chatRef = null;
 let currentGameState = null;
+let knownPlayers = {};
 
 let llamaClicks = 0;
 let loroClicks = 0;
@@ -37,7 +38,7 @@ let turnTimer = null;
 let timeLeft = 10;
 let pendingWildCard = null;
 
-// WEBRTC CHAT DE VOZ (MICRÓFONO EN TIEMPO REAL)
+// WEBRTC CHAT DE VOZ EN TIEMPO REAL
 let localStream = null;
 let isMicOn = false;
 let peerConnections = {};
@@ -45,6 +46,26 @@ const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
 const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+2', '+4', '🚫', '🔄'];
+
+// DETECTAR ABANDONO DE NAVEGADOR
+window.addEventListener('beforeunload', () => {
+  if (currentRoomCode && myPlayerName && isFirebaseConnected && db) {
+    db.ref(`chats/${currentRoomCode}`).push({
+      sender: 'SISTEMA',
+      text: `${myPlayerName} abandonó la partida.`
+    });
+    db.ref(`rooms/${currentRoomCode}/players/${myPlayerId}`).remove();
+  }
+});
+
+function showToastNotification(message) {
+  const toast = document.getElementById('system-notification');
+  const msgEl = document.getElementById('toast-message');
+  if (!toast || !msgEl) return;
+  msgEl.innerText = message;
+  toast.classList.remove('hidden');
+  setTimeout(() => { toast.classList.add('hidden'); }, 4000);
+}
 
 function initHistory() {
   if (isFirebaseConnected && db) {
@@ -101,6 +122,11 @@ function getPlayerName() {
   const input = document.getElementById('player-name-input').value.trim();
   if (!input) { alert('Por favor, ingresa tu apodo de jugador.'); return null; }
   myPlayerName = input;
+
+  document.getElementById('my-name-display').innerText = myPlayerName;
+  document.getElementById('my-avatar-display').src = selectedAvatarUrl;
+  document.getElementById('my-skill-display').innerText = selectedSkill;
+
   return myPlayerName;
 }
 
@@ -173,6 +199,17 @@ function listenToRoom() {
     roomRef.on('value', snapshot => {
       if (!snapshot.exists()) return;
       currentGameState = snapshot.val();
+      
+      const activePlayers = currentGameState.players || {};
+      Object.keys(knownPlayers).forEach(pId => {
+        if (!activePlayers[pId]) {
+          showToastNotification(`${knownPlayers[pId]} abandonó la partida`);
+        }
+      });
+
+      knownPlayers = {};
+      Object.values(activePlayers).forEach(p => { knownPlayers[p.id] = p.name; });
+
       updateUI();
     });
   }
@@ -184,7 +221,38 @@ function listenToChat() {
   chatRef.on('child_added', snapshot => {
     const msgData = snapshot.val();
     renderL4DMessage(msgData);
+    renderLobbyMessage(msgData);
+
+    if (msgData.sender === 'SISTEMA' && msgData.text.includes('abandonó')) {
+      showToastNotification(msgData.text);
+    }
   });
+}
+
+// CHAT SALA DE ESPERA
+function handleLobbyChatKey(event) {
+  if (event.key === 'Enter') {
+    const input = document.getElementById('lobby-chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    if (isFirebaseConnected && db && currentRoomCode) {
+      db.ref('chats/' + currentRoomCode).push({ sender: myPlayerName, text: text });
+    } else {
+      renderLobbyMessage({ sender: myPlayerName, text: text });
+    }
+    input.value = '';
+  }
+}
+
+function renderLobbyMessage(msgData) {
+  const container = document.getElementById('lobby-chat-messages');
+  if (!container) return;
+  const msgEl = document.createElement('div');
+  msgEl.className = 'chat-msg';
+  msgEl.innerHTML = `<b>${msgData.sender}:</b> ${msgData.text}`;
+  container.appendChild(msgEl);
+  container.scrollTop = container.scrollHeight;
 }
 
 function handleChatKey(event) {
@@ -194,11 +262,7 @@ function handleChatKey(event) {
     if (!text) return;
 
     if (isFirebaseConnected && db && currentRoomCode) {
-      db.ref('chats/' + currentRoomCode).push({
-        sender: myPlayerName,
-        text: text,
-        timestamp: Date.now()
-      });
+      db.ref('chats/' + currentRoomCode).push({ sender: myPlayerName, text: text });
     } else {
       renderL4DMessage({ sender: myPlayerName, text: text });
     }
@@ -216,7 +280,7 @@ function renderL4DMessage(msgData) {
   container.scrollTop = container.scrollHeight;
 }
 
-// FUNCIONAMIENTO COMPLETO DE CHAT DE VOZ Y MICRÓFONO
+// MICRÓFONO WEBRTC
 async function toggleMicrophone() {
   const btn = document.getElementById('btn-mic-toggle');
   const text = document.getElementById('mic-status-text');
@@ -228,12 +292,11 @@ async function toggleMicrophone() {
       btn.className = 'ui-btn btn-mic-on';
       text.innerText = 'Micrófono Encendido';
       
-      // Adjuntar stream de voz local a conexiones pares
       Object.keys(peerConnections).forEach(pId => {
         localStream.getTracks().forEach(track => peerConnections[pId].addTrack(track, localStream));
       });
     } catch (err) {
-      alert('No se pudo activar el micrófono. Por favor permite los permisos del navegador.');
+      alert('No se pudo activar el micrófono. Concede los permisos necesarios.');
     }
   } else {
     if (localStream) {
@@ -327,7 +390,16 @@ function updateUI() {
     showScreen('screen-lobby');
     const playersArr = Object.values(currentGameState.players || {});
     document.getElementById('player-count').innerText = playersArr.length;
-    document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `<li class="text-center"><b>${p.name}</b><br><small style="color:var(--text-muted);">${p.skill}</small></li>`).join('');
+    
+    document.getElementById('lobby-players-list').innerHTML = playersArr.map(p => `
+      <div class="lobby-player-card">
+        <img src="${p.avatar}" class="lobby-player-avatar">
+        <div class="text-center" style="width:100%;">
+          <div class="lobby-player-name">${p.name}</div>
+          <div class="lobby-player-skill">${p.skill}</div>
+        </div>
+      </div>
+    `).join('');
     
     const isHost = currentGameState.host === myPlayerId;
     document.getElementById('btn-start-game').style.display = isHost ? 'block' : 'none';
@@ -384,7 +456,6 @@ function renderGameBoard() {
   renderMyHand(isMyTurn);
 }
 
-// DISTRIBUCIÓN ADAPTATIVA DE JUGADORES EN CUADRANTE (2 IZQ, 2 DER, RESTO ARRIBA)
 function renderOpponentsQuadrant(turnPlayerId) {
   const zoneTop = document.getElementById('opponents-top');
   const zoneLeft = document.getElementById('opponents-left');
@@ -448,14 +519,14 @@ function playCard(card) {
 
   if (stack > 0) {
     if (card.value !== '+2' && card.value !== '+4') {
-      alert(`¡Existe un acumulado activo de +${stack}! Debes colocar una carta +2 o +4, o robar.`);
+      alert(`¡Hay un pozo acumulado de +${stack}! Juega una carta +2 o +4, o roba cartas.`);
       return;
     }
   }
 
   const isValid = card.color === 'negro' || card.color === currentGameState.activeColor || card.value === topCard.value;
   if (!isValid) {
-    alert('Esta carta no coincide con el color ni con el número de la mesa.');
+    alert('Esta carta no coincide con el color ni con el número actual.');
     return;
   }
 
@@ -552,7 +623,7 @@ function drawCardCurrentPlayer() {
 function sayUno() {
   const myHand = currentGameState?.players[myPlayerId]?.hand;
   if (myHand && myHand.length === 1) {
-    alert('¡Has gritado UNO exitosamente!');
+    alert('¡Cargado el grito de UNO correctamente!');
     if (isFirebaseConnected && db && currentRoomCode) {
       db.ref('chats/' + currentRoomCode).push({
         sender: 'SISTEMA',
@@ -560,7 +631,7 @@ function sayUno() {
       });
     }
   } else {
-    alert('¡Solo puedes cantar UNO cuando te quede 1 carta!');
+    alert('Solo puedes cantar UNO si te queda exactamente 1 carta.');
   }
 }
 
@@ -573,7 +644,7 @@ function returnToLobby() {
   }
 }
 
-// MOVIMIENTO DE MASCOTAS
+// LÓGICA DE MASCOTAS
 let petInterval = null;
 function initRoamingPets() {
   if (petInterval) clearInterval(petInterval);
@@ -621,7 +692,7 @@ function handleGoodPetClick() {
 }
 
 function useSpecialSkill() {
-  if (hasUsedSkill) return alert('Ya has utilizado tu habilidad especial en esta partida.');
+  if (hasUsedSkill) return alert('Ya has usado la habilidad única en esta partida.');
   hasUsedSkill = true;
   if (selectedSkill === 'Escudo Táctico') currentGameState.stack = 0;
   if (roomRef) roomRef.child('stack').set(currentGameState.stack);
