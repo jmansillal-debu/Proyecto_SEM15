@@ -3,200 +3,180 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UNO Tactical</title>
+  <title>Juego UNO - Edición Especial</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
-
-  <div id="fly-card-container"></div>
-
-  <div id="bad-pet" class="floating-pet-wrapper" onclick="handleLlamaClick()">
-    <div id="bad-pet-speech" class="speech-bubble">¡Tócame y te doy una suma :y! 🎁</div>
-    <div id="bad-pet-avatar" class="pet-avatar bad-pet-size">🦙</div>
+  <div id="system-notification" class="toast hidden">
+    <span id="toast-message"></span>
   </div>
-
-  <div id="good-pet" class="floating-pet-wrapper" onclick="handleGoodPetClick()">
-    <div id="good-pet-speech" class="speech-bubble hidden">¡Te quito cartas :v! 🦜</div>
-    <div id="good-pet-avatar" class="pet-avatar">🦜</div>
+  <div id="pets-roaming-layer" class="pets-hidden">
+    <div id="bad-pet" class="roaming-pet" onclick="handleLlamaClick()">
+      🦙 <span id="llama-clicks" class="click-badge">0</span>
+    </div>
+    <div id="good-pet" class="roaming-pet" onclick="handleGoodPetClick()">
+      🦜 <span id="loro-clicks" class="click-badge">0</span>
+    </div>
   </div>
-
-  <div id="screen-menu" class="screen active">
-    <div class="menu-container">
-      
-      <div class="panel panel-rules">
-        <h2>CENTRO DE COMANDO</h2>
-        <p class="subtitle">EDICIÓN TÁCTICA Y PODERES</p>
-        
-        <div class="rule-box">
-          <h3>Super Acumulación (+2, +4, +6, +8)</h3>
-          <p>Encadena ataques de suma sin límite. El castigo se acumula secuencialmente hasta que un jugador no pueda responder.</p>
+  <section id="screen-setup" class="screen active">
+    <h1 class="game-title">UNO MULTIJUGADOR</h1>
+    <div class="setup-layout-grid">
+      <div class="card setup-card text-left">
+        <h2 class="section-subtitle">⚙️ Ajustes del Jugador</h2>
+        <div class="form-group">
+          <label for="player-name-input">Apodo de Jugador:</label>
+          <input type="text" id="player-name-input" placeholder="Tu nombre aquí..." maxlength="15">
         </div>
-        
-        <div class="rule-box">
-          <h3>Habilidades de Operadores</h3>
-          <p>Cada avatar posee una habilidad única por partida: Escudo Anti-Suma, Espionaje de Mano, Intercambio Táctico y Ojo Águila.</p>
-        </div>
-
-        <div class="rule-box">
-          <h3>Mascotas Tácticas</h3>
-          <p>🦙 <b>Llama de Suministro:</b> Te otorga cartas de suma tácticas.<br>🦜 <b>Loro Dron:</b> Captura y descarta tus cartas sobrantes.</p>
-        </div>
-        
-        <div class="rule-box">
-          <h3>Reloj de Presión (10s)</h3>
-          <p>Si la cuenta regresa a cero, sufrirás penalizaciones automáticas de robo.</p>
-        </div>
-      </div>
-
-      <!-- Panel Central: Selección de Personaje -->
-      <div class="panel panel-main">
-        <div class="title-banner">
-          <h1>UNO TACTICAL</h1>
-          <p>Crado por @Rex </p>
-        </div>
-        
-        <div class="input-group">
-          <label>NICKNAME DE JUGADOR</label>
-          <input type="text" id="player-name-input" placeholder="Introduce tu ID..." maxlength="12">
-        </div>
-
-        <!-- SELECCIÓN DE 4 PERSONAJES CORREGIDA -->
-        <div class="avatar-selection-group">
-          <label>SELECCIONA OPERADOR Y HABILIDAD</label>
+        <div class="form-group">
+          <label>Selecciona tu Personaje:</label>
           <div class="avatar-picker">
-            <div class="avatar-card selected" onclick="selectAvatar(this, './assets/foto1.jpeg', 'Escudo Táctico', 'Anula la suma acumulada actual.')">
-              <img src="./assets/foto1.jpeg" class="avatar-option">
-              <span class="skill-tag">Escudo</span>
+            <div class="avatar-card selected" onclick="selectAvatar(this, './assets/foto1.jpeg', 'Escudo Táctico', 'Anula completamente la acumulación de cartas suma activas.')">
+              <img src="./assets/foto1.jpeg" class="avatar-img">
+              <span class="avatar-tag">Escudo</span>
             </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto2.jfif', 'Espionaje', 'Revela las cartas del oponente activo.')">
-              <img src="./assets/foto2.jfif" class="avatar-option">
-              <span class="skill-tag">Visión</span>
+            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto2.jfif', 'Espionaje', 'Revela las cartas de la mano del rival.')">
+              <img src="./assets/foto2.jfif" class="avatar-img">
+              <span class="avatar-tag">Visión</span>
             </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto3.jfif', 'Robo Rápido', 'Obtienes una carta de suma instantánea.')">
-              <img src="./assets/foto3.jfif" class="avatar-option">
-              <span class="skill-tag">Suma +</span>
+            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto3.jfif', 'Robo Rápido', 'Inserta una carta +4 extra a la pila de la mesa.')">
+              <img src="./assets/foto3.jfif" class="avatar-img">
+              <span class="avatar-tag">Suma+</span>
             </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto4.jfif', 'Purga', 'Descarta 2 cartas al azar de tu mano.')">
-              <img src="./assets/foto4.jfif" class="avatar-option">
-              <span class="skill-tag">Purga</span>
+            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto4.jfif', 'Purga Directa', 'Elimina automáticamente 2 cartas aleatorias de tu mano.')">
+              <img src="./assets/foto4.jfif" class="avatar-img">
+              <span class="avatar-tag">Purga</span>
             </div>
           </div>
-          <p id="skill-description" class="skill-desc-box">Habilidad: Anula la suma acumulada actual.</p>
+          <div class="skill-info-container">
+            <p id="skill-description" class="skill-info"><b>Habilidad:</b> Anula completamente la acumulación de cartas suma activas.</p>
+          </div>
         </div>
-
-        <button class="btn btn-primary" onclick="createRoom()">CREAR SALA DE GUERRA</button>
-
-        <div class="divider">O DESPLIÉGATE A UNA SALA</div>
-
-        <div class="join-group">
-          <input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="6">
-          <button class="btn btn-secondary" onclick="joinRoom()">UNIRSE</button>
+        <div class="action-buttons">
+          <button class="ui-btn primary" onclick="createRoom()">Crear Nueva Sala</button>
+          <div class="join-group">
+            <input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="6">
+            <button class="ui-btn secondary" onclick="joinRoom()">Unirse</button>
+          </div>
         </div>
       </div>
-
-      <!-- Panel Derecho: Historial -->
-      <div class="panel panel-winners">
-        <h2>🏆 REGISTRO DE VICTORIAS</h2>
-        <p class="subtitle">HISTORIAL DE OPERACIONES</p>
-        <ul id="winners-history-list" class="winners-list">
-          <li class="empty-msg">Cargando datos...</li>
+      <div class="card instructions-card text-left">
+        <h2 class="section-subtitle">📖 Reglas del Juego</h2>
+        <ul>
+          <li><b>Objetivo:</b> Descartar todas tus cartas antes que los demás.</li>
+          <li><b>Mesa:</b> Coincide el color o el número de la carta activa.</li>
+          <li><b>Habilidades:</b> Puedes usar tu habilidad 1 sola vez por partida.</li>
         </ul>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- LOBBY -->
-  <div id="screen-lobby" class="screen">
-    <div class="lobby-card">
-      <h2>SALA DE ESPERA TÁCTICA</h2>
-      <p>CÓDIGO DE ENLACE: <strong id="lobby-code-display" class="highlight-text">------</strong></p>
-      
-      <div class="lobby-players">
-        <h3>Escuadrón Conectado (<span id="player-count">0</span>/4):</h3>
-        <ul id="lobby-players-list"></ul>
-      </div>
-
-      <button id="btn-start-game" class="btn btn-primary" onclick="startGame()" style="display:none;">INICIAR MISOÓN</button>
-      <p id="waiting-msg" style="display:none;">Esperando que el líder inicie el despliegue...</p>
-    </div>
-  </div>
-
-  <!-- PANTALLA DE JUEGO -->
-  <div id="screen-game" class="screen">
-    <div class="game-container">
-      
-      <div id="opponents-zone" class="opponents-container"></div>
-
-      <div class="center-zone">
-        <div class="status-bar">
-          <div>TURNO: <span id="turn-display">---</span></div>
-          <div class="timer-badge">⏳ <span id="timer-display">10</span>s</div>
-          <div>COLOR: <span id="active-color-indicator" class="color-dot"></span></div>
-          <div>ACUMULADO: <span id="stack-display">+0</span></div>
+        <h2 class="section-subtitle" style="margin-top: 14px;">🐾 Mascotas Interactivas</h2>
+        <div class="pet-rule-box">
+          <ul>
+            <li>🦙 <b>Llama Mala:</b> 40 clicks te otorgan una carta +4. <small style="color:var(--accent-primary); display:block; margin-top:2px;">⚠️ ¡Si la usas teniendo 1 carta recibes 20 de castigo!</small></li>
+            <li style="margin-top: 6px;">🦜 <b>Loro Bueno:</b> 40 clicks eliminan 1 carta de tu mano. <small style="color:var(--accent-secondary); display:block; margin-top:2px;">ℹ️ No puedes ganar usando al loro (mínimo 2 cartas).</small></li>
+          </ul>
         </div>
-
-        <div class="table-center">
-          <div class="deck-spot" onclick="drawCardCurrentPlayer()">
-            <div class="unocard card-back">
-              <div class="card-inner">UNO</div>
-            </div>
-            <span>EXTRAER</span>
+      </div>
+    </div>
+    <div class="history-container text-left">
+      <div class="history-box">
+        <h3>🏆 Campeones Recientes</h3>
+        <ul id="winners-history-list"></ul>
+      </div>
+      <div class="history-box">
+        <h3>👤 Registro de Jugadores</h3>
+        <ul id="all-players-history-list"></ul>
+      </div>
+    </div>
+  </section>
+  <section id="screen-lobby" class="screen">
+    <div class="card text-left">
+      <h2>Código de Sala: <span id="lobby-code-display" style="color:var(--accent-primary);">------</span></h2>
+      <p style="color:var(--text-muted); margin-top: 4px;">Jugadores en la sala: <span id="player-count">0</span>/4</p>
+    </div>
+    <div id="lobby-players-list" class="lobby-grid"></div>
+    <div id="waiting-msg-container" class="card text-left">
+      <p class="pulse-text" style="color:var(--uno-yellow);">⏳ Esperando a que el anfitrión inicie la partida...</p>
+    </div>
+    <button id="btn-start-game" class="ui-btn primary huge" style="display: none;" onclick="startGame()">¡EMPEZAR JUEGO!</button>
+    <div class="chat-container">
+      <div id="lobby-chat-messages" class="chat-box"></div>
+      <input type="text" id="lobby-chat-input" placeholder="Escribe un mensaje en el lobby..." onkeypress="handleLobbyChatKey(event)">
+    </div>
+  </section>
+  <section id="screen-game" class="screen">
+    <header class="game-header text-left">
+      <div class="player-profile-badge">
+        <img id="my-avatar-display" src="./assets/foto1.jpeg" alt="Mi Avatar">
+        <div>
+          <span id="my-name-display" style="font-weight:bold; display:block;">Jugador</span>
+          <small id="my-skill-display" style="color:var(--text-muted);">Habilidad</small>
+        </div>
+      </div>
+      <div class="turn-indicator-box">
+        <small style="color:var(--text-muted); font-size:0.75rem;">TURNO ACTUAL:</small>
+        <div id="turn-display" style="font-weight:bold; color:var(--uno-yellow);">---</div>
+        <div style="font-size:0.85rem;">⏳ <span id="timer-display">10</span>s</div>
+      </div>
+      <div class="voice-controls">
+        <button id="btn-mic-toggle" class="ui-btn btn-mic-off" onclick="toggleMicrophone()">
+          🎤 <span id="mic-status-text">Mic Off</span>
+        </button>
+      </div>
+    </header>
+    <div class="game-board">
+      <div id="opponents-top" class="opponents-row"></div>
+      <div class="middle-row">
+        <div id="opponents-left" class="opponents-col"></div>
+        <div class="center-table">
+          <div class="deck-pile" onclick="drawCardCurrentPlayer()">
+            <div class="uno-card card-back">UNO</div>
+            <small style="margin-top:4px;">Robar</small>
           </div>
-
-          <div id="top-card" class="unocard"></div>
+          <div class="played-pile">
+            <div id="top-card" class="uno-card c-rojo">
+              <span class="card-corner">-</span>
+              <div class="card-inner">-</div>
+            </div>
+          </div>
+          <div class="table-info text-left" style="font-size:0.85rem;">
+            <div>Color: <span id="active-color-indicator" class="color-badge c-rojo"></span></div>
+            <div style="margin-top:4px;">Pozo: <span id="stack-display" style="font-weight:bold;">+0</span></div>
+          </div>
         </div>
-      </div>
-
-      <!-- ZONA INFERIOR -->
-      <div class="bottom-zone">
-        <div class="controls-bar">
-          <button id="btn-use-skill" class="btn btn-skill" onclick="useSpecialSkill()">HABILIDAD ESPECIAL</button>
-          <button class="btn btn-uno" onclick="sayUno()">¡UNO!</button>
-        </div>
-
-        <div class="my-hand-title">Mano Operativa (<span id="my-card-count">0</span> cartas)</div>
-        <div id="my-hand" class="hand-container"></div>
-      </div>
-
-    </div>
-
-    <!-- CONTENEDOR DE CHAT ÚNICO FIJO -->
-    <div id="l4d-chat-container" class="chat-fixed-container">
-      <div class="chat-header">COMUNICACIONES DE CAMPO</div>
-      <div id="l4d-chat-messages" class="chat-messages-box"></div>
-      <div class="chat-input-row">
-        <input type="text" id="l4d-chat-input" placeholder="Enviar mensaje..." onkeypress="handleChatKey(event)">
+        <div id="opponents-right" class="opponents-col"></div>
       </div>
     </div>
-
-    <!-- MODAL CAMBIO DE COLOR -->
-    <div id="color-modal" class="modal hidden">
-      <div class="modal-content">
-        <h3>SELECCIONA FRECUENCIA / COLOR</h3>
-        <div class="color-buttons">
-          <button class="btn-color c-rojo" onclick="selectColor('rojo')">Rojo</button>
-          <button class="btn-color c-azul" onclick="selectColor('azul')">Azul</button>
-          <button class="btn-color c-verde" onclick="selectColor('verde')">Verde</button>
-          <button class="btn-color c-amarillo" onclick="selectColor('amarillo')">Amarillo</button>
-        </div>
+    <footer class="game-footer">
+      <div class="action-bar">
+        <button class="ui-btn skill-btn" onclick="useSpecialSkill()">⚡ Habilidad</button>
+        <button class="ui-btn uno-btn" onclick="sayUno()">🔥 UNO! (<span id="my-card-count">0</span>)</button>
+      </div>
+      <div id="my-hand" class="hand-container"></div>
+      <div class="in-game-chat">
+        <div id="l4d-chat-messages" class="chat-box"></div>
+        <input type="text" id="l4d-chat-input" placeholder="Enviar mensaje al grupo..." onkeypress="handleChatKey(event)">
+      </div>
+    </footer>
+  </section>
+  <div id="color-modal" class="modal-overlay hidden">
+    <div class="modal-body text-center">
+      <h3>Selecciona un Color</h3>
+      <div class="color-selector-grid">
+        <button class="color-btn btn-rojo" onclick="selectColor('rojo')">Rojo</button>
+        <button class="color-btn btn-azul" onclick="selectColor('azul')">Azul</button>
+        <button class="color-btn btn-verde" onclick="selectColor('verde')">Verde</button>
+        <button class="color-btn btn-amarillo" onclick="selectColor('amarillo')">Amarillo</button>
       </div>
     </div>
-
-    <!-- MODAL GANADOR -->
-    <div id="winner-modal" class="modal hidden">
-      <div class="modal-content winner-box">
-        <h1 class="winner-title">🏆 ¡VICTORIA TÁCTICA! 🏆</h1>
-        <p id="winner-name-display" class="winner-name">---</p>
-        <p class="winner-sub">Ha dominado el campo de batalla.</p>
-        <button class="btn btn-primary" onclick="returnToLobby()">VOLVER AL LOBBY</button>
-      </div>
-    </div>
-
   </div>
-
+  <div id="winner-modal" class="modal-overlay hidden">
+    <div class="modal-body text-center">
+      <h1>🏆 ¡FIN DE LA PARTIDA!</h1>
+      <p style="margin-top:8px;">El ganador es:</p>
+      <h2 id="winner-name-display" style="color:var(--accent-secondary); margin: 12px 0;">Nombre del Jugador</h2>
+      <button class="ui-btn primary" onclick="returnToLobby()">Volver a la Sala</button>
+    </div>
+  </div>
   <script src="app.js"></script>
 </body>
 </html>
