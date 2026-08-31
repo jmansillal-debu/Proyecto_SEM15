@@ -1,182 +1,907 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Juego UNO - Edición Especial</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-</head>
-<body>
-  <div id="system-notification" class="toast hidden">
-    <span id="toast-message"></span>
-  </div>
-  <div id="pets-roaming-layer" class="pets-hidden">
-    <div id="bad-pet" class="roaming-pet" onclick="handleLlamaClick()">
-      🦙 <span id="llama-clicks" class="click-badge">0</span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UNO Multijugador - Edición Especial</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  </head>
+
+  <body>
+
+    <div id="system-notification" class="toast hidden">
+      <span id="toast-message"></span>
     </div>
-    <div id="good-pet" class="roaming-pet" onclick="handleGoodPetClick()">
-      🦜 <span id="loro-clicks" class="click-badge">0</span>
-    </div>
-  </div>
-  <section id="screen-setup" class="screen active">
-    <h1 class="game-title">UNO MULTIJUGADOR</h1>
-    <div class="setup-layout-grid">
-      <div class="card setup-card text-left">
-        <h2 class="section-subtitle">⚙️ Ajustes del Jugador</h2>
-        <div class="form-group">
-          <label for="player-name-input">Apodo de Jugador:</label>
-          <input type="text" id="player-name-input" placeholder="Tu nombre aquí..." maxlength="15">
-        </div>
-        <div class="form-group">
-          <label>Selecciona tu Personaje:</label>
-          <div class="avatar-picker">
-            <div class="avatar-card selected" onclick="selectAvatar(this, './assets/foto1.jpeg', 'Escudo Táctico', 'Anula completamente la acumulación de cartas suma activas.')">
-              <img src="./assets/foto1.jpeg" class="avatar-img">
-              <span class="avatar-tag">Escudo</span>
-            </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto2.jfif', 'Espionaje', 'Revela las cartas de la mano del rival.')">
-              <img src="./assets/foto2.jfif" class="avatar-img">
-              <span class="avatar-tag">Visión</span>
-            </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto3.jfif', 'Robo Rápido', 'Inserta una carta +4 extra a la pila de la mesa.')">
-              <img src="./assets/foto3.jfif" class="avatar-img">
-              <span class="avatar-tag">Suma+</span>
-            </div>
-            <div class="avatar-card" onclick="selectAvatar(this, './assets/foto4.jfif', 'Purga Directa', 'Elimina automáticamente 2 cartas aleatorias de tu mano.')">
-              <img src="./assets/foto4.jfif" class="avatar-img">
-              <span class="avatar-tag">Purga</span>
-            </div>
-          </div>
-          <div class="skill-info-container">
-            <p id="skill-description" class="skill-info"><b>Habilidad:</b> Anula completamente la acumulación de cartas suma activas.</p>
-          </div>
-        </div>
-        <div class="action-buttons">
-          <button class="ui-btn primary" onclick="createRoom()">Crear Nueva Sala</button>
-          <div class="join-group">
-            <input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="6">
-            <button class="ui-btn secondary" onclick="joinRoom()">Unirse</button>
-          </div>
-        </div>
+    <div id="pets-roaming-layer" class="pets-hidden">
+      <div
+        id="bad-pet"
+        class="roaming-pet pet-bad"
+        onclick="handleLlamaClick()"
+        title="Llama Mala"
+      >
+        🦙
+        <span id="llama-clicks" class="click-badge">0</span>
       </div>
-      <div class="card instructions-card text-left">
-        <h2 class="section-subtitle">📖 Reglas del Juego</h2>
-        <ul>
-          <li><b>Objetivo:</b> Descartar todas tus cartas antes que los demás.</li>
-          <li><b>Mesa:</b> Coincide el color o el número de la carta activa.</li>
-          <li><b>Habilidades:</b> Puedes usar tu habilidad 1 sola vez por partida.</li>
-        </ul>
-        <h2 class="section-subtitle" style="margin-top: 14px;">🐾 Mascotas Interactivas</h2>
-        <div class="pet-rule-box">
-          <ul>
-            <li>🦙 <b>Llama Mala:</b> 40 clicks te otorgan una carta +4. <small style="color:var(--accent-primary); display:block; margin-top:2px;">⚠️ ¡Si la usas teniendo 1 carta recibes 20 de castigo!</small></li>
-            <li style="margin-top: 6px;">🦜 <b>Loro Bueno:</b> 40 clicks eliminan 1 carta de tu mano. <small style="color:var(--accent-secondary); display:block; margin-top:2px;">ℹ️ No puedes ganar usando al loro (mínimo 2 cartas).</small></li>
-          </ul>
-        </div>
+
+      <div
+        id="good-pet"
+        class="roaming-pet pet-good"
+        onclick="handleGoodPetClick()"
+        title="Loro Bueno"
+      >
+        🦜
+        <span id="loro-clicks" class="click-badge">0</span>
       </div>
     </div>
-    <div class="history-container text-left">
-      <div class="history-box">
-        <h3>🏆 Campeones Recientes</h3>
-        <ul id="winners-history-list"></ul>
-      </div>
-      <div class="history-box">
-        <h3>👤 Registro de Jugadores</h3>
-        <ul id="all-players-history-list"></ul>
-      </div>
-    </div>
-  </section>
-  <section id="screen-lobby" class="screen">
-    <div class="card text-left">
-      <h2>Código de Sala: <span id="lobby-code-display" style="color:var(--accent-primary);">------</span></h2>
-      <p style="color:var(--text-muted); margin-top: 4px;">Jugadores en la sala: <span id="player-count">0</span>/4</p>
-    </div>
-    <div id="lobby-players-list" class="lobby-grid"></div>
-    <div id="waiting-msg-container" class="card text-left">
-      <p class="pulse-text" style="color:var(--uno-yellow);">⏳ Esperando a que el anfitrión inicie la partida...</p>
-    </div>
-    <button id="btn-start-game" class="ui-btn primary huge" style="display: none;" onclick="startGame()">¡EMPEZAR JUEGO!</button>
-    <div class="chat-container">
-      <div id="lobby-chat-messages" class="chat-box"></div>
-      <input type="text" id="lobby-chat-input" placeholder="Escribe un mensaje en el lobby..." onkeypress="handleLobbyChatKey(event)">
-    </div>
-  </section>
-  <section id="screen-game" class="screen">
-    <header class="game-header text-left">
-      <div class="player-profile-badge">
-        <img id="my-avatar-display" src="./assets/foto1.jpeg" alt="Mi Avatar">
+
+    <section id="screen-setup" class="screen active">
+      <div class="page-heading">
         <div>
-          <span id="my-name-display" style="font-weight:bold; display:block;">Jugador</span>
-          <small id="my-skill-display" style="color:var(--text-muted);">Habilidad</small>
+          <span class="eyebrow">EDICIÓN ESPECIAL</span>
+          <h1 class="game-title">UNO MULTIJUGADOR</h1>
+          <p class="page-description">
+            Crea una sala, elige tu personaje y prepárate para una partida llena
+            de cartas, habilidades y eventos especiales.
+          </p>
+        </div>
+
+        <div class="heading-badge">
+          <span>🎴</span>
+          <strong>ONLINE</strong>
         </div>
       </div>
-      <div class="turn-indicator-box">
-        <small style="color:var(--text-muted); font-size:0.75rem;">TURNO ACTUAL:</small>
-        <div id="turn-display" style="font-weight:bold; color:var(--uno-yellow);">---</div>
-        <div style="font-size:0.85rem;">⏳ <span id="timer-display">10</span>s</div>
+
+      <div class="setup-layout-grid">
+
+        <div class="card setup-card text-left">
+          <div class="card-heading">
+            <div class="heading-icon">⚙️</div>
+
+            <div>
+              <h2 class="section-subtitle">Ajustes del Jugador</h2>
+              <p class="section-description">
+                Personaliza tu identidad antes de entrar a la mesa.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="player-name-input"> 👤 Apodo de Jugador </label>
+
+            <input
+              type="text"
+              id="player-name-input"
+              placeholder="Tu nombre aquí..."
+              maxlength="15"
+              autocomplete="off"
+            />
+
+            <small class="input-hint"> Máximo 15 caracteres. </small>
+          </div>
+
+          <div class="form-group">
+            <div class="label-row">
+              <label> 🧙 Selecciona tu Personaje </label>
+
+              <span class="small-badge"> 3 usos por partida </span>
+            </div>
+
+            <div class="avatar-picker">
+              <div
+                class="avatar-card selected"
+                onclick="
+                  selectAvatar(
+                    this,
+                    './assets/foto1.jpeg',
+                    'Escudo Táctico',
+                    'Anula completamente la acumulación de cartas suma activas.',
+                  )
+                "
+              >
+                <div class="avatar-image-wrap">
+                  <img
+                    src="./assets/foto1.jpeg"
+                    class="avatar-img"
+                    alt="Escudo Táctico"
+                  />
+                </div>
+
+                <span class="avatar-tag"> Escudo </span>
+
+                <small> 🛡️ Defensa </small>
+              </div>
+
+              <div
+                class="avatar-card"
+                onclick="
+                  selectAvatar(
+                    this,
+                    './assets/foto2.jfif',
+                    'Espionaje',
+                    'Revela las cartas de la mano de los rivales.',
+                  )
+                "
+              >
+                <div class="avatar-image-wrap">
+                  <img
+                    src="./assets/foto2.jfif"
+                    class="avatar-img"
+                    alt="Espionaje"
+                  />
+                </div>
+
+                <span class="avatar-tag"> Visión </span>
+
+                <small> 🔍 Espía </small>
+              </div>
+
+              <div
+                class="avatar-card"
+                onclick="
+                  selectAvatar(
+                    this,
+                    './assets/foto3.jfif',
+                    'Robo Rápido',
+                    'Agrega +4 al pozo de cartas de la mesa.',
+                  )
+                "
+              >
+                <div class="avatar-image-wrap">
+                  <img
+                    src="./assets/foto3.jfif"
+                    class="avatar-img"
+                    alt="Robo Rápido"
+                  />
+                </div>
+
+                <span class="avatar-tag"> Suma+ </span>
+
+                <small> ⚡ Ataque </small>
+              </div>
+
+              <div
+                class="avatar-card"
+                onclick="
+                  selectAvatar(
+                    this,
+                    './assets/foto4.jfif',
+                    'Purga Directa',
+                    'Elimina automáticamente 2 cartas aleatorias de tu mano.',
+                  )
+                "
+              >
+                <div class="avatar-image-wrap">
+                  <img
+                    src="./assets/foto4.jfif"
+                    class="avatar-img"
+                    alt="Purga Directa"
+                  />
+                </div>
+
+                <span class="avatar-tag"> Purga </span>
+
+                <small> 🔥 Descarte </small>
+              </div>
+            </div>
+
+            <div class="skill-info-container">
+              <div class="skill-info-title">⚡ HABILIDAD SELECCIONADA</div>
+
+              <p id="skill-description" class="skill-info">
+                <b>Habilidad:</b>
+                Anula completamente la acumulación de cartas suma activas.
+              </p>
+
+              <div class="skill-use-preview">
+                <span>Usos disponibles:</span>
+                <strong>3 / 3</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button class="ui-btn primary big-action" onclick="createRoom()">
+              <span>🎮</span>
+              Crear Nueva Sala
+            </button>
+
+            <div class="join-divider">
+              <span>O ÚNETE A UNA SALA</span>
+            </div>
+
+            <div class="join-group">
+              <input
+                type="text"
+                id="room-code-input"
+                placeholder="CÓDIGO"
+                maxlength="6"
+                autocomplete="off"
+              />
+
+              <button class="ui-btn secondary" onclick="joinRoom()">
+                Unirse
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card instructions-card text-left">
+          <div class="card-heading">
+            <div class="heading-icon blue">📖</div>
+
+            <div>
+              <h2 class="section-subtitle">Reglas del Juego</h2>
+
+              <p class="section-description">
+                Todo lo que necesitas saber antes de comenzar.
+              </p>
+            </div>
+          </div>
+
+          <div class="rule-list">
+            <div class="rule-item">
+              <span class="rule-number">01</span>
+
+              <div>
+                <strong>Objetivo</strong>
+
+                <p>Descarta todas tus cartas antes que los demás jugadores.</p>
+              </div>
+            </div>
+
+            <div class="rule-item">
+              <span class="rule-number">02</span>
+
+              <div>
+                <strong>Cartas</strong>
+
+                <p>Coincide el color, número o símbolo de la carta activa.</p>
+              </div>
+            </div>
+
+            <div class="rule-item">
+              <span class="rule-number">03</span>
+
+              <div>
+                <strong>Habilidades</strong>
+
+                <p>
+                  Cada personaje dispone de 3 usos de su habilidad especial
+                  durante la partida.
+                </p>
+              </div>
+            </div>
+
+            <div class="rule-item">
+              <span class="rule-number">04</span>
+
+              <div>
+                <strong>Tiempo</strong>
+
+                <p>Cada turno dispone de 10 segundos antes de robar.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mini-section-title">🐾 Mascotas Interactivas</div>
+
+          <div class="pet-rule-box">
+            <div class="pet-rule">
+              <div class="pet-rule-icon">🦙</div>
+
+              <div>
+                <strong>Llama Mala</strong>
+
+                <p>Consigue una carta <b>+4</b> después de 40 clics.</p>
+
+                <small class="warning-text">
+                  ⚠️ Si intentas usarla con 1 carta recibirás un castigo.
+                </small>
+              </div>
+            </div>
+
+            <div class="pet-rule">
+              <div class="pet-rule-icon">🦜</div>
+
+              <div>
+                <strong>Loro Bueno</strong>
+
+                <p>
+                  Después de solo <b>10 clics</b>, elimina 1 carta de tu mano.
+                </p>
+
+                <small class="success-text">
+                  ℹ️ Puede dejarte con 1 carta, pero nunca puede darte la
+                  victoria.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <div class="tip-box">
+            <span>💡</span>
+
+            <div>
+              <strong>Consejo</strong>
+
+              <p>
+                Guarda tus habilidades para momentos estratégicos. No siempre
+                conviene gastarlas inmediatamente.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="voice-controls">
-        <button id="btn-mic-toggle" class="ui-btn btn-mic-off" onclick="toggleMicrophone()">
-          🎤 <span id="mic-status-text">Mic Off</span>
+
+      <div class="setup-info-grid">
+        <div class="info-panel">
+          <span class="info-panel-icon"> 🎯 </span>
+
+          <div>
+            <small>OBJETIVO</small>
+            <strong>Quedarte sin cartas</strong>
+            <p>Usa las cartas especiales y habilidades para tomar ventaja.</p>
+          </div>
+        </div>
+
+        <div class="info-panel">
+          <span class="info-panel-icon"> ⚡ </span>
+
+          <div>
+            <small>HABILIDADES</small>
+            <strong>3 usos disponibles</strong>
+            <p>Cada personaje tiene una habilidad diferente.</p>
+          </div>
+        </div>
+
+        <div class="info-panel">
+          <span class="info-panel-icon"> 🐾 </span>
+
+          <div>
+            <small>MASCOTAS</small>
+            <strong>Eventos especiales</strong>
+            <p>Haz clic en ellas mientras aparecen durante la partida.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="history-container text-left">
+        <div class="history-box">
+          <div class="history-heading">
+            <span>🏆</span>
+
+            <div>
+              <h3>Campeones Recientes</h3>
+              <small>Últimos ganadores registrados</small>
+            </div>
+          </div>
+
+          <ul id="winners-history-list"></ul>
+        </div>
+
+        <div class="history-box">
+          <div class="history-heading">
+            <span>👤</span>
+
+            <div>
+              <h3>Registro de Jugadores</h3>
+              <small>Jugadores y personajes utilizados</small>
+            </div>
+          </div>
+
+          <ul id="all-players-history-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-lobby" class="screen">
+      <div class="lobby-header card">
+        <div>
+          <span class="eyebrow"> SALA MULTIJUGADOR </span>
+
+          <h2>
+            Código de Sala:
+            <span id="lobby-code-display" class="room-code"> ------ </span>
+          </h2>
+
+          <p class="muted-text">
+            Comparte este código con tus amigos para que puedan entrar.
+          </p>
+        </div>
+
+        <div class="room-counter">
+          <span>JUGADORES</span>
+
+          <strong>
+            <span id="player-count">0</span>
+            <small>/4</small>
+          </strong>
+        </div>
+      </div>
+      <div class="lobby-info-grid">
+        <div class="lobby-info-card">
+          <span>🎮</span>
+          <div>
+            <strong>Modo multijugador</strong>
+            <small>Hasta 4 jugadores</small>
+          </div>
+        </div>
+
+        <div class="lobby-info-card">
+          <span>⚡</span>
+          <div>
+            <strong>Habilidades</strong>
+            <small>3 usos por partida</small>
+          </div>
+        </div>
+
+        <div class="lobby-info-card">
+          <span>⏱️</span>
+          <div>
+            <strong>Turnos rápidos</strong>
+            <small>10 segundos</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div>
+          <span class="eyebrow"> PARTICIPANTES </span>
+
+          <h3>Jugadores conectados</h3>
+        </div>
+
+        <span class="live-indicator">
+          <i></i>
+          EN VIVO
+        </span>
+      </div>
+
+      <div id="lobby-players-list" class="lobby-grid"></div>
+
+      <div id="waiting-msg-container" class="card waiting-card text-left">
+        <div class="waiting-icon">⏳</div>
+
+        <div>
+          <strong> Esperando al anfitrión </strong>
+
+          <p class="pulse-text">
+            El anfitrión debe iniciar la partida cuando todos estén listos.
+          </p>
+        </div>
+      </div>
+
+      <button
+        id="btn-start-game"
+        class="ui-btn primary huge start-game-btn"
+        style="display: none"
+        onclick="startGame()"
+      >
+        🎮 ¡EMPEZAR JUEGO!
+      </button>
+
+      <div class="chat-container lobby-chat">
+        <div class="chat-header">
+          <div>
+            <span class="chat-icon"> 💬 </span>
+
+            <div>
+              <strong>Chat del Lobby</strong>
+              <small>Habla con los jugadores</small>
+            </div>
+          </div>
+
+          <span class="chat-status"> ● ONLINE </span>
+        </div>
+
+        <div id="lobby-chat-messages" class="chat-box"></div>
+
+        <div class="chat-input-row">
+          <input
+            type="text"
+            id="lobby-chat-input"
+            placeholder="Escribe un mensaje..."
+            onkeypress="handleLobbyChatKey(event)"
+            autocomplete="off"
+          />
+
+          <button
+            class="chat-send-btn"
+            onclick="handleLobbyChatKey({ key: 'Enter' })"
+          >
+            ➤
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-game" class="screen">
+
+      <header class="game-header">
+
+        <div class="player-profile-badge">
+          <div class="profile-avatar-ring">
+            <img
+              id="my-avatar-display"
+              src="./assets/foto1.jpeg"
+              alt="Mi Avatar"
+            />
+
+            <span class="online-dot"></span>
+          </div>
+
+          <div>
+            <span id="my-name-display" class="profile-name"> Jugador </span>
+
+            <small id="my-skill-display" class="profile-skill">
+              Habilidad
+            </small>
+          </div>
+        </div>
+
+        <div class="turn-indicator-box">
+          <small> TURNO ACTUAL </small>
+
+          <strong id="turn-display"> --- </strong>
+
+          <div class="timer-pill">
+            ⏳
+            <span id="timer-display">10</span>s
+          </div>
+        </div>
+
+        <div class="header-game-stats">
+          <div class="header-stat">
+            <span>🎴</span>
+            <div>
+              <small>TU MANO</small>
+              <strong>
+                <span id="header-card-count">0</span>
+              </strong>
+            </div>
+          </div>
+
+          <div class="header-stat">
+            <span>⚡</span>
+            <div>
+              <small>HABILIDAD</small>
+              <strong> <span id="skill-uses-display">3</span>/3 </strong>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="game-status-banner">
+        <div class="status-item">
+          <span class="status-dot"></span>
+          <span>Partida activa</span>
+        </div>
+
+        <div class="status-divider"></div>
+
+        <div class="status-item">
+          🎯
+          <span>Descarta todas tus cartas</span>
+        </div>
+
+        <div class="status-divider"></div>
+
+        <div class="status-item">
+          ⚡
+          <span>Usa tus habilidades estratégicamente</span>
+        </div>
+      </div>
+
+      <div class="game-board">
+
+        <div id="opponents-top" class="opponents-row"></div>
+
+        <div class="middle-row">
+
+          <div id="opponents-left" class="opponents-col"></div>
+
+          <div class="center-table">
+            <!-- POZO -->
+
+            <div class="table-zone deck-zone">
+              <div class="zone-label">
+                <span>🂠</span>
+                MAZO
+              </div>
+
+              <div class="deck-pile" onclick="drawCardCurrentPlayer()">
+                <div class="uno-card card-back">
+                  <span>UNO</span>
+                </div>
+
+                <small> Robar carta </small>
+              </div>
+            </div>
+
+            <div class="table-zone active-zone">
+              <div class="zone-label">
+                <span>🔥</span>
+                CARTA ACTIVA
+              </div>
+
+              <div class="played-pile">
+                <div id="top-card" class="uno-card c-rojo">
+                  <span class="card-corner"> - </span>
+
+                  <div class="card-inner">-</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-zone table-info-zone">
+              <div class="table-info-card">
+                <span class="info-symbol"> 🎨 </span>
+
+                <div>
+                  <small>COLOR ACTIVO</small>
+
+                  <div>
+                    <span
+                      id="active-color-indicator"
+                      class="color-badge c-rojo"
+                    ></span>
+
+                    <strong id="active-color-text"> Rojo </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-info-card">
+                <span class="info-symbol"> 📥 </span>
+
+                <div>
+                  <small>POZO</small>
+
+                  <strong id="stack-display"> +0 </strong>
+
+                  <em> cartas acumuladas </em>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="opponents-right" class="opponents-col"></div>
+        </div>
+
+        <div class="board-info-grid">
+          <div class="board-info-card">
+            <span>🎯</span>
+
+            <div>
+              <small>OBJETIVO</small>
+
+              <strong> Quédate sin cartas </strong>
+
+              <p>Juega cartas compatibles con el color o valor activo.</p>
+            </div>
+          </div>
+          <div class="board-info-card">
+            <span>⏱️</span>
+
+            <div>
+              <small>TURNO</small>
+
+              <strong> 10 segundos </strong>
+
+              <p>Si el tiempo termina, robarás automáticamente.</p>
+            </div>
+          </div>
+
+          <div class="board-info-card">
+            <span>🐾</span>
+
+            <div>
+              <small>MASCOTAS</small>
+
+              <strong> Eventos especiales </strong>
+
+              <p>Haz clic cuando aparezcan por el tablero.</p>
+            </div>
+          </div>
+
+          <div class="board-info-card">
+            <span>💡</span>
+
+            <div>
+              <small>CONSEJO</small>
+
+              <strong> Guarda tu habilidad </strong>
+
+              <p>Tienes 3 usos. Úsalos cuando realmente los necesites.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="game-footer">
+
+        <div class="action-bar">
+          <button class="ui-btn skill-btn" onclick="useSpecialSkill()">
+            <span> ⚡ </span>
+            <span> Habilidad </span>
+            <strong> (<span id="skill-button-count">3</span>/3) </strong>
+          </button>
+
+          <button class="ui-btn uno-btn" onclick="sayUno()">
+            🔥
+
+            <span> UNO! </span>
+
+            <strong> (<span id="my-card-count">0</span>) </strong>
+          </button>
+        </div>
+
+        <div class="hand-panel">
+          <div class="hand-panel-header">
+            <div>
+              <span class="eyebrow"> TU MANO </span>
+
+              <h3>Tus cartas</h3>
+            </div>
+
+            <div class="hand-counter">
+              <span> 🎴 </span>
+
+              <strong id="hand-card-counter"> 0 </strong>
+
+              <small> cartas </small>
+            </div>
+          </div>
+
+          <div id="my-hand" class="hand-container"></div>
+
+          <div class="hand-help-text">
+            💡 Haz clic en una carta para jugarla cuando sea tu turno.
+          </div>
+        </div>
+
+        <div class="game-bottom-grid">
+
+          <div class="in-game-chat compact-chat">
+            <div class="chat-header">
+              <div class="chat-title-group">
+                <span class="chat-icon"> 💬 </span>
+
+                <div>
+                  <strong> Chat de partida </strong>
+
+                  <small> Comunicación del grupo </small>
+                </div>
+              </div>
+
+              <button
+                id="btn-mic-toggle"
+                class="mic-chat-btn btn-mic-off"
+                onclick="toggleMicrophone()"
+                title="Activar / desactivar micrófono"
+              >
+                🎤
+
+                <span id="mic-status-text"> Off </span>
+              </button>
+            </div>
+
+            <div id="l4d-chat-messages" class="chat-box game-chat-box"></div>
+
+            <div class="chat-input-row">
+              <input
+                type="text"
+                id="l4d-chat-input"
+                placeholder="Escribe un mensaje..."
+                onkeypress="handleChatKey(event)"
+                autocomplete="off"
+              />
+
+              <button
+                class="chat-send-btn"
+                onclick="handleChatKey({ key: 'Enter' })"
+              >
+                ➤
+              </button>
+            </div>
+          </div>
+
+          <div class="match-info-panel">
+            <div class="panel-title">
+              <span>📊</span>
+              <div>
+                <strong>Estado de partida</strong>
+                <small>Información rápida</small>
+              </div>
+            </div>
+
+            <div class="match-stat-row">
+              <span> 🎴 Tus cartas </span>
+
+              <strong id="match-hand-count"> 0 </strong>
+            </div>
+
+            <div class="match-stat-row">
+              <span> ⚡ Habilidades </span>
+
+              <strong> <span id="match-skill-count"> 3 </span>/3 </strong>
+            </div>
+
+            <div class="match-stat-row">
+              <span> 📥 Pozo </span>
+
+              <strong id="match-stack-count"> +0 </strong>
+            </div>
+
+            <div class="match-tip">
+              <span> 💡 </span>
+
+              <p>
+                Recuerda: el Loro puede ayudarte hasta dejarte con una carta,
+                pero debes jugar esa última carta para ganar.
+              </p>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </section>
+
+    <div id="color-modal" class="modal-overlay hidden">
+      <div class="modal-body text-center color-modal-body">
+        <div class="modal-icon">🎨</div>
+
+        <span class="eyebrow"> CARTA ESPECIAL </span>
+
+        <h3>Selecciona un Color</h3>
+
+        <p class="modal-description">
+          Elige el color que quedará activo después de jugar tu carta.
+        </p>
+
+        <div class="color-selector-grid">
+          <button class="color-btn btn-rojo" onclick="selectColor('rojo')">
+            🔴 Rojo
+          </button>
+
+          <button class="color-btn btn-azul" onclick="selectColor('azul')">
+            🔵 Azul
+          </button>
+
+          <button class="color-btn btn-verde" onclick="selectColor('verde')">
+            🟢 Verde
+          </button>
+
+          <button
+            class="color-btn btn-amarillo"
+            onclick="selectColor('amarillo')"
+          >
+            🟡 Amarillo
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="winner-modal" class="modal-overlay hidden">
+      <div class="modal-body text-center winner-modal-body">
+        <div class="winner-icon">🏆</div>
+
+        <span class="eyebrow"> PARTIDA FINALIZADA </span>
+
+        <h1>¡FIN DE LA PARTIDA!</h1>
+
+        <p class="winner-label">El ganador es:</p>
+
+        <h2 id="winner-name-display" class="winner-name">Nombre del Jugador</h2>
+
+        <div class="winner-message">🎉 ¡Excelente partida! 🎉</div>
+
+        <button class="ui-btn primary" onclick="returnToLobby()">
+          ↩ Volver a la Sala
         </button>
       </div>
-    </header>
-    <div class="game-board">
-      <div id="opponents-top" class="opponents-row"></div>
-      <div class="middle-row">
-        <div id="opponents-left" class="opponents-col"></div>
-        <div class="center-table">
-          <div class="deck-pile" onclick="drawCardCurrentPlayer()">
-            <div class="uno-card card-back">UNO</div>
-            <small style="margin-top:4px;">Robar</small>
-          </div>
-          <div class="played-pile">
-            <div id="top-card" class="uno-card c-rojo">
-              <span class="card-corner">-</span>
-              <div class="card-inner">-</div>
-            </div>
-          </div>
-          <div class="table-info text-left" style="font-size:0.85rem;">
-            <div>Color: <span id="active-color-indicator" class="color-badge c-rojo"></span></div>
-            <div style="margin-top:4px;">Pozo: <span id="stack-display" style="font-weight:bold;">+0</span></div>
-          </div>
-        </div>
-        <div id="opponents-right" class="opponents-col"></div>
-      </div>
     </div>
-    <footer class="game-footer">
-      <div class="action-bar">
-        <button class="ui-btn skill-btn" onclick="useSpecialSkill()">⚡ Habilidad</button>
-        <button class="ui-btn uno-btn" onclick="sayUno()">🔥 UNO! (<span id="my-card-count">0</span>)</button>
-      </div>
-      <div id="my-hand" class="hand-container"></div>
-      <div class="in-game-chat">
-        <div id="l4d-chat-messages" class="chat-box"></div>
-        <input type="text" id="l4d-chat-input" placeholder="Enviar mensaje al grupo..." onkeypress="handleChatKey(event)">
-      </div>
-    </footer>
-  </section>
-  <div id="color-modal" class="modal-overlay hidden">
-    <div class="modal-body text-center">
-      <h3>Selecciona un Color</h3>
-      <div class="color-selector-grid">
-        <button class="color-btn btn-rojo" onclick="selectColor('rojo')">Rojo</button>
-        <button class="color-btn btn-azul" onclick="selectColor('azul')">Azul</button>
-        <button class="color-btn btn-verde" onclick="selectColor('verde')">Verde</button>
-        <button class="color-btn btn-amarillo" onclick="selectColor('amarillo')">Amarillo</button>
-      </div>
-    </div>
-  </div>
-  <div id="winner-modal" class="modal-overlay hidden">
-    <div class="modal-body text-center">
-      <h1>🏆 ¡FIN DE LA PARTIDA!</h1>
-      <p style="margin-top:8px;">El ganador es:</p>
-      <h2 id="winner-name-display" style="color:var(--accent-secondary); margin: 12px 0;">Nombre del Jugador</h2>
-      <button class="ui-btn primary" onclick="returnToLobby()">Volver a la Sala</button>
-    </div>
-  </div>
-  <script src="app.js"></script>
-</body>
+
+    <script src="app.js"></script>
+  </body>
 </html>
