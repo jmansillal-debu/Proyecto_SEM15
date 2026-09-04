@@ -242,6 +242,7 @@ function selectAvatar(
   );
   selectedAvatarUrl = url;
   selectedSkill = skillName;
+  saveLocalProfile();
   const description =
     document.getElementById(
       'skill-description'
@@ -252,21 +253,14 @@ function selectAvatar(
       skillDesc;
   }
   updateSkillDisplay();
+  updateMatchSkillPanel();
 }
 function showScreen(screenId) {
-  document
-    .querySelectorAll('.screen')
-    .forEach(
-      screen =>
-        screen.classList.remove(
-          'active'
-        )
-    );
-  document
-    .getElementById(screenId)
-    ?.classList.add(
-      'active'
-    );
+  document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+  document.getElementById(screenId)?.classList.add('active');
+  const chatToggle=document.getElementById('chat-bubble-toggle');
+  if(chatToggle) chatToggle.classList.toggle('hidden',screenId!=='screen-lobby'&&screenId!=='screen-game');
+  if(screenId!=='screen-lobby'&&screenId!=='screen-game'){chatUnread=0;updateChatBadge();}
   const petsLayer =
     document.getElementById(
       'pets-roaming-layer'
@@ -427,7 +421,19 @@ function createRoom(){
   else{currentGameState=initialData;updateUI();showScreen('screen-lobby');}
 }
 function resolveRoomCode(code){
-  return db.ref(`rooms/${code}`).once('value').then(snapshot=>{if(snapshot.exists())return{key:code,data:snapshot.val()};return db.ref(`roomCodes/${code}`).once('value').then(alias=>{const key=alias.val();if(!key)return null;return db.ref(`rooms/${key}`).once('value').then(room=>room.exists()?{key,data:room.val()}:null);});});
+  const clean=String(code||'').trim().toUpperCase();
+  return db.ref(`rooms/${clean}`).once('value').then(snapshot=>{
+    if(snapshot.exists() && String(snapshot.val().code||'').toUpperCase()===clean)return{key:clean,data:snapshot.val()};
+    return db.ref(`roomCodes/${clean}`).once('value').then(alias=>{
+      const key=alias.val();
+      if(!key)return null;
+      return db.ref(`rooms/${key}`).once('value').then(room=>{
+        if(!room.exists())return null;
+        const data=room.val();
+        return String(data.code||'').toUpperCase()===clean?{key,data}:null;
+      });
+    });
+  });
 }
 function joinRoom(){
   if(!getPlayerName())return;
@@ -467,10 +473,30 @@ function copyRoomCode(){
 }
 function fallbackCopy(code){const temp=document.createElement('textarea');temp.value=code;document.body.appendChild(temp);temp.select();try{document.execCommand('copy');}catch(e){}temp.remove();showToastNotification(`📋 Código ${code} copiado.`);}
 function changeRoomCode(){
-  if(!currentGameState||currentGameState.host!==myPlayerId||!roomRef)return;
-  const current=currentGameState.code||currentRoomCode;const next=prompt('Personaliza el nuevo código de la sala (6 caracteres):',current);if(next===null)return;
-  const clean=next.trim().toUpperCase();if(!/^[A-Z0-9]{6}$/.test(clean)){alert('El código debe tener exactamente 6 caracteres.');return;}if(clean===current)return;
-  db.ref(`rooms/${clean}`).once('value').then(snapshot=>{if(snapshot.exists())throw new Error('Ese código ya está ocupado.');return db.ref(`roomCodes/${clean}`).set(currentRoomCode).then(()=>roomRef.child('code').set(clean));}).then(()=>{showToastNotification(`✏️ Código cambiado a ${clean}. Nadie sale de la partida.`);updateUI();}).catch(error=>alert(error.message||'No se pudo cambiar el código.'));
+  if(!currentGameState||currentGameState.host!==myPlayerId||!roomRef||!db){showToastNotification('⚠️ Solo el anfitrión puede editar el código.');return;}
+  const current=String(currentGameState.code||currentRoomCode).toUpperCase();
+  const next=prompt('Personaliza el nuevo código de la sala (6 caracteres):',current);
+  if(next===null)return;
+  const clean=next.trim().toUpperCase();
+  if(!/^[A-Z0-9]{6}$/.test(clean)){alert('El código debe tener exactamente 6 caracteres.');return;}
+  if(clean===current){showToastNotification('ℹ️ El código no cambió.');return;}
+  Promise.all([db.ref(`rooms/${clean}`).once('value'),db.ref(`roomCodes/${clean}`).once('value')]).then(([roomSnap,aliasSnap])=>{
+    if(roomSnap.exists()||aliasSnap.exists())throw new Error('Ese código ya está ocupado. Elige otro.');
+    const oldCode=currentGameState.code||currentRoomCode;
+    const updates={};
+    updates[`roomCodes/${clean}`]=currentRoomCode;
+    updates[`roomCodes/${oldCode}`]=null;
+    updates[`rooms/${currentRoomCode}/code`]=clean;
+    updates[`rooms/${currentRoomCode}/roomCode`]=clean;
+    return db.ref().update(updates);
+  }).then(()=>{
+    currentGameState.code=clean;
+    currentGameState.roomCode=clean;
+    const display=document.getElementById('lobby-code-display');
+    if(display)display.innerText=clean;
+    showToastNotification(`✏️ Código cambiado a ${clean}. Todos siguen dentro de la misma sala.`);
+    updateUI();
+  }).catch(error=>alert(error.message||'No se pudo cambiar el código.'));
 }
 function leaveRoom(){if(roomRef&&myPlayerId)roomRef.child(`players/${myPlayerId}`).remove().catch(()=>{});if(chatRef)chatRef.off();roomRef=null;chatRef=null;currentRoomCode=null;currentGameState=null;knownPlayers={};resetPetCounters();showScreen('screen-setup');}
 function returnToSetup(){leaveRoom();}
@@ -478,6 +504,7 @@ function updateChatBadge(){const badge=document.getElementById('chat-unread-badg
 function toggleChatBubble(){const activeScreen=document.querySelector('.screen.active');const panel=activeScreen?.querySelector('.lobby-chat,.compact-chat');if(!panel)return;panel.classList.toggle('chat-open');if(panel.classList.contains('chat-open')){chatUnread=0;updateChatBadge();(panel.querySelector('input')||document.getElementById('l4d-chat-input'))?.focus();}}
 function notifyIncomingChat(msgData){if(!msgData||msgData.sender===myPlayerName||msgData.sender==='SISTEMA')return;chatUnread++;updateChatBadge();showToastNotification(`💬 ${msgData.sender}: ${msgData.text}`);}
 function listenToChat(){if(!currentRoomCode||!isFirebaseConnected||!db)return;if(chatRef)chatRef.off();chatListeningAt=Date.now();chatPriming=true;chatRef=db.ref(`chats/${currentRoomCode}`);chatRef.on('child_added',snapshot=>{const msgData=snapshot.val()||{};renderL4DMessage(msgData);renderLobbyMessage(msgData);if(!chatPriming&&msgData.sender!==myPlayerName)notifyIncomingChat(msgData);if(msgData.sender==='SISTEMA'&&msgData.text?.includes('abandonó'))showToastNotification(msgData.text);});chatRef.once('value').then(()=>{setTimeout(()=>chatPriming=false,150);});}
+function sendChatReaction(reaction){if(!currentRoomCode)return;pushChatMessage(reaction);}
 function pushChatMessage(text){if(!text||!currentRoomCode)return;const data={sender:myPlayerName,text,createdAt:firebase.database.ServerValue.TIMESTAMP};if(isFirebaseConnected&&db)db.ref(`chats/${currentRoomCode}`).push(data);else{renderL4DMessage(data);renderLobbyMessage(data);}}
 function handleLobbyChatKey(event){if(event.key!=='Enter')return;const input=document.getElementById('lobby-chat-input');const text=input?.value.trim();if(!text)return;pushChatMessage(text);input.value='';}
 function renderLobbyMessage(msgData){const container=document.getElementById('lobby-chat-messages');if(!container)return;const msgEl=document.createElement('div');msgEl.className='chat-msg';msgEl.innerHTML=`<b>${escapeHtml(msgData.sender||'Jugador')}:</b> ${escapeHtml(msgData.text||'')}`;container.appendChild(msgEl);container.scrollTop=container.scrollHeight;}
@@ -1855,6 +1882,12 @@ function useSpecialSkill() {
       updateUI();
     }
   }
+}
+function updateMatchSkillPanel(){
+  const uses=currentGameState?.players?.[myPlayerId]?.skillUses ?? MAX_SKILL_USES;
+  updateText('match-skill-count',uses);
+  updateText('match-skill-count-panel',uses);
+  updateText('skill-button-count',uses);
 }
 function updateSkillDisplay() {
   let uses =
