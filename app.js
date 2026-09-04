@@ -451,6 +451,7 @@ function createRoom() {
       db.ref(
         'rooms/' + code
       );
+    roomRef.child('players/'+myPlayerId).onDisconnect().remove();
     roomRef
       .set(initialData)
       .then(
@@ -477,86 +478,73 @@ function createRoom() {
   }
 }
 function joinRoom() {
-  if (!getPlayerName()) {
-    return;
-  }
-  const input =
-    document.getElementById(
-      'room-code-input'
-    );
-  const code =
-    input.value
-      .trim()
-      .toUpperCase();
-  if (!code) {
-    alert(
-      'Por favor ingresa un código válido.'
-    );
-    return;
-  }
-  currentRoomCode =
-    code;
-  if (
-    isFirebaseConnected &&
-    db
-  ) {
-    roomRef =
-      db.ref(
-        'rooms/' + code
-      );
-    roomRef.once(
-      'value',
-      snapshot => {
-        if (!snapshot.exists()) {
-          alert(
-            'La sala ingresada no existe.'
-          );
-          return;
-        }
-        const players =
-          snapshot.val().players ||
-          {};
-        if (
-          Object.keys(players).length >= 4
-        ) {
-          alert(
-            'La sala ya está llena.'
-          );
-          return;
-        }
-        roomRef
-          .child(
-            'players/' +
-            myPlayerId
-          )
-          .set({
-            id:
-              myPlayerId,
-            name:
-              myPlayerName,
-            avatar:
-              selectedAvatarUrl,
-            skill:
-              selectedSkill,
-            hand:
-              [],
-            isHost:
-              false,
-            skillUses:
-              MAX_SKILL_USES
-          })
-          .then(
-            () => {
-              listenToRoom();
-              listenToChat();
-              initVoiceSignaling();
-              showScreen(
-                'screen-lobby'
-              );
-            }
-          );
+  if (!getPlayerName()) return;
+  const input=document.getElementById('room-code-input');
+  const code=input.value.trim().toUpperCase();
+  if (!code) { alert('Por favor ingresa un código válido.'); return; }
+  const enterRoom=ref=>{
+    roomRef=ref;
+    roomRef.child('players/'+myPlayerId).onDisconnect().remove();
+    roomRef.once('value',snapshot=>{
+      if(!snapshot.exists()){ alert('La sala ingresada no existe.'); return; }
+      const data=snapshot.val();
+      const players=data.players||{};
+      if(Object.keys(players).length>=4){ alert('La sala ya está llena.'); return; }
+      currentRoomCode=ref.key;
+      roomRef.child('players/'+myPlayerId).set({id:myPlayerId,name:myPlayerName,avatar:selectedAvatarUrl,skill:selectedSkill,hand:[],isHost:false,skillUses:MAX_SKILL_USES}).then(()=>{
+        savePlayerProfileHistory();
+        listenToRoom();
+        listenToChat();
+        initVoiceSignaling();
+        showScreen('screen-lobby');
+      });
+    });
+  };
+  if(isFirebaseConnected&&db){
+    db.ref('rooms').orderByChild('inviteCode').equalTo(code).once('value',snapshot=>{
+      if(snapshot.exists()){
+        const rooms=snapshot.val();
+        const keys=Object.keys(rooms).filter(k=>(rooms[k].status||'waiting')==='waiting');
+        if(keys.length){ enterRoom(db.ref('rooms/'+keys[0])); return; }
       }
-    );
+      enterRoom(db.ref('rooms/'+code));
+    });
+  }
+}
+function ensureHostOwnership(activePlayers){
+  if(!currentGameState||currentGameState.status!=='waiting'||!isFirebaseConnected||!roomRef)return;
+  const host=currentGameState.host;
+  if(host&&activePlayers[host])return;
+  const ids=Object.keys(activePlayers).sort();
+  if(!ids.length)return;
+  const nextHost=ids[0];
+  roomRef.child('host').transaction(value=>value||nextHost).then(result=>{
+    if(result.committed&&result.snapshot.val()===nextHost){
+      roomRef.child('players/'+nextHost+'/isHost').set(true);
+      if(nextHost===myPlayerId)showToastNotification('👑 Ahora eres el anfitrión.');
+    }
+  });
+}
+function copyInviteCode(){
+  const code=currentGameState?.inviteCode||currentRoomCode;
+  if(!code)return;
+  if(navigator.clipboard){navigator.clipboard.writeText(code).then(()=>showToastNotification('📋 Código copiado.'));}
+  else showToastNotification('Código: '+code);
+}
+function leaveRoom(){
+  if(!currentRoomCode){showScreen('screen-setup');return;}
+  const ref=roomRef;
+  const code=currentRoomCode;
+  if(isFirebaseConnected&&db&&ref){
+    ref.child('players/'+myPlayerId).remove().then(()=>{
+      showToastNotification('Has salido de la sala.');
+      if(chatRef)chatRef.off();
+      ref.off();
+      roomRef=null; chatRef=null; currentRoomCode=null; currentGameState=null; knownPlayers={};
+      showScreen('screen-setup');
+    });
+  }else{
+    roomRef=null; currentRoomCode=null; currentGameState=null; showScreen('screen-setup');
   }
 }
 function listenToRoom() {
@@ -565,8 +553,7 @@ function listenToRoom() {
       'lobby-code-display'
     );
   if (codeDisplay) {
-    codeDisplay.innerText =
-      currentRoomCode;
+    codeDisplay.innerText = currentGameState.inviteCode || currentRoomCode;
   }
   if (!roomRef) {
     return;
@@ -582,6 +569,7 @@ function listenToRoom() {
       const activePlayers =
         currentGameState.players ||
         {};
+      ensureHostOwnership(activePlayers);
       Object.keys(
         knownPlayers
       ).forEach(
@@ -1022,6 +1010,8 @@ function updateUI() {
     showScreen(
       'screen-lobby'
     );
+    const lobbyCode=document.getElementById('lobby-code-display');
+    if(lobbyCode)lobbyCode.innerText=currentGameState.inviteCode||currentRoomCode;
     const playersArr =
       Object.values(
         currentGameState.players ||
@@ -1040,39 +1030,13 @@ function updateUI() {
         'lobby-players-list'
       );
     if (lobby) {
-      lobby.innerHTML =
-        playersArr
-          .map(
-            player => `
-              <div class="lobby-player-card">
-                <img
-                  src="${player.avatar}"
-                  class="lobby-player-avatar"
-                  alt="${player.name}"
-                >
-                <div
-                  class="text-center"
-                  style="width:100%;"
-                >
-                  <div
-                    class="lobby-player-name"
-                  >
-                    ${player.name}
-                  </div>
-                  <div
-                    class="lobby-player-skill"
-                  >
-                    ${player.skill}
-                  </div>
-                </div>
-              </div>
-            `
-          )
-          .join('');
+      lobby.innerHTML=playersArr.map(player=>`<div class="lobby-player-card animated-lobby-avatar"><div class="lobby-avatar-wrap"><img src="${player.avatar||'./assets/foto1.jpeg'}" class="lobby-player-avatar animated-avatar" alt="${player.name}"></div><div class="text-center" style="width:100%;"><div class="lobby-player-name">${player.name}${currentGameState.host===player.id?' 👑':''}</div><div class="lobby-player-skill">${player.skill||''}</div></div></div>`).join('');
     }
-    const isHost =
-      currentGameState.host ===
-      myPlayerId;
+    const isHost = currentGameState.host === myPlayerId;
+    const hostEditor=document.getElementById('host-room-editor');
+    if(hostEditor)hostEditor.classList.toggle('hidden',!isHost);
+    const transferNotice=document.getElementById('host-transfer-notice');
+    if(transferNotice)transferNotice.classList.toggle('hidden',!isHost);
     const startButton =
       document.getElementById(
         'btn-start-game'
@@ -1274,109 +1238,33 @@ function renderGameBoard() {
   );
   updateSkillDisplay();
 }
-function renderOpponentsQuadrant(
-  turnPlayerId
-) {
-  const zoneTop =
-    document.getElementById(
-      'opponents-top'
-    );
-  const zoneLeft =
-    document.getElementById(
-      'opponents-left'
-    );
-  const zoneRight =
-    document.getElementById(
-      'opponents-right'
-    );
-  if (
-    !zoneTop ||
-    !zoneLeft ||
-    !zoneRight
-  ) {
-    return;
-  }
-  zoneTop.innerHTML =
-    '';
-  zoneLeft.innerHTML =
-    '';
-  zoneRight.innerHTML =
-    '';
-  const opponents =
-    Object.values(
-      currentGameState.players ||
-      {}
-    )
-      .filter(
-        player =>
-          player.id !==
-          myPlayerId
-      );
-  opponents.forEach(
-    (player, index) => {
-      const isTurn =
-        player.id ===
-        turnPlayerId;
-      const cardCount =
-        player.hand
-          ? player.hand.length
-          : 0;
-      const oppEl =
-        document.createElement(
-          'div'
-        );
-      oppEl.className =
-        `opponent-mini-card ${
-          isTurn
-            ? 'active-turn'
-            : ''
-        }`;
-      oppEl.innerHTML = `
-        <img
-          src="${player.avatar}"
-          class="opp-avatar"
-          alt="${player.name}"
-        >
-        <div
-          class="text-left"
-          style="width:100%;"
-        >
-          <div
-            class="opp-name"
-            style="
-              font-size:.7rem;
-              font-weight:bold;
-            "
-          >
-            ${player.name}
-          </div>
-          <div
-            style="
-              font-size:.58rem;
-              color:var(--text-muted);
-            "
-          >
-            ${cardCount} cartas
-          </div>
-        </div>
-      `;
-      if (index === 0) {
-        zoneLeft.appendChild(
-          oppEl
-        );
-      }
-      else if (index === 1) {
-        zoneRight.appendChild(
-          oppEl
-        );
-      }
-      else {
-        zoneTop.appendChild(
-          oppEl
-        );
-      }
-    }
-  );
+function renderOpponentsQuadrant(turnPlayerId) {
+  const zoneTop=document.getElementById('opponents-top');
+  const zoneLeft=document.getElementById('opponents-left');
+  const zoneRight=document.getElementById('opponents-right');
+  if(!zoneTop||!zoneLeft||!zoneRight)return;
+  zoneTop.innerHTML=''; zoneLeft.innerHTML=''; zoneRight.innerHTML='';
+  const order=currentGameState.turnOrder||Object.keys(currentGameState.players||{});
+  const myIndex=Math.max(0,order.indexOf(myPlayerId));
+  const positions=['left','top','right'];
+  order.forEach((id,relative)=>{
+    if(id===myPlayerId)return;
+    const player=currentGameState.players?.[id];
+    if(!player)return;
+    const step=(relative-myIndex+order.length)%order.length;
+    const position=positions[step-1];
+    if(!position)return;
+    const isTurn=player.id===turnPlayerId;
+    const cardCount=player.hand?player.hand.length:0;
+    const cards=Math.min(cardCount,10);
+    const hand=Array.from({length:cards},(_,i)=>`<span class="opponent-card-back" style="--i:${i}"></span>`).join('');
+    const oppEl=document.createElement('div');
+    oppEl.className=`opponent-seat-card ${isTurn?'active-turn':''}`;
+    oppEl.innerHTML=`<div class="opponent-hand opponent-hand-${position}">${hand}</div><div class="opponent-profile"><div class="opponent-avatar-frame"><img src="${player.avatar||'./assets/foto1.jpeg'}" class="opp-avatar animated-avatar" alt="${player.name}"><span class="online-dot"></span></div><div class="opp-meta"><strong>${player.name}</strong><span>${cardCount} cartas</span><small>${player.skill||''}</small></div></div>`;
+    if(position==='left')zoneLeft.appendChild(oppEl);
+    else if(position==='right')zoneRight.appendChild(oppEl);
+    else zoneTop.appendChild(oppEl);
+  });
 }
 function renderMyHand(
   isMyTurn
