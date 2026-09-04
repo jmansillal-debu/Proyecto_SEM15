@@ -2203,4 +2203,72 @@ audio[id^="audio_"]{display:none}
   #screen-game .game-header{gap:7px}
   .profile-upload{flex-wrap:wrap}
   .profile-upload-info{min-width:120px}
+}:root{
+  --bg-dark:#0b0d0c;
+  --bg-main:#121614;
+  --card-bg:#18201c;
+  --card-bg-light:#202a24;
+  --card-bg-hover:#29352d;
+  --border-color:#344139;
+  --border-light:#48564b;
+  --accent-primary:#d9a441;
+  --accent-secondary:#63c174;
+  --uno-red:#c83b3b;
+  --uno-blue:#347bb5;
+  --uno-green:#3f9b5d;
+  --uno-yellow:#d8a32f;
+  --uno-black:#202421;
+  --text-main:#f5f3eb;
+  --text-muted:#b5b9b1;
+  --text-dark-muted:#7f887f;
 }
+body{font-size:16px;background:radial-gradient(circle at 50% 40%,rgba(71,121,76,.18),transparent 32%),linear-gradient(135deg,#080a09,#111713 55%,#080a09);}
+button,input{font-size:1rem}
+.screen{font-size:1rem}
+.section-description,.muted-text,.profile-skill,.lobby-player-skill,.chat-box,.hand-help-text{font-size:.88rem!important}
+.game-title{letter-spacing:.08em;text-shadow:0 4px 20px rgba(0,0,0,.55)}
+.card,.game-header,.chat-container,.in-game-chat,.match-info-panel{background:linear-gradient(145deg,rgba(30,38,33,.96),rgba(16,22,19,.96));border-color:rgba(202,180,118,.22);box-shadow:0 14px 35px rgba(0,0,0,.34)}
+.realistic-table{position:relative;min-height:500px!important;border:12px solid #4b3524;border-radius:30px;background:radial-gradient(ellipse at center,#2f7047 0%,#225437 45%,#173c29 78%,#10291d 100%);box-shadow:inset 0 0 0 3px #876342,inset 0 0 55px rgba(0,0,0,.48),0 20px 45px rgba(0,0,0,.45);overflow:hidden}
+.realistic-table:before{content:"";position:absolute;inset:18px;border:2px solid rgba(222,194,132,.18);border-radius:22px;pointer-events:none}
+.game-board .table-seat{z-index:3}
+.realistic-table .opponents-row{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:48%;min-height:100px;display:flex;justify-content:center}
+.realistic-table .middle-row{position:absolute;inset:95px 18px 105px;display:block;min-height:0}
+.realistic-table .opponents-col{position:absolute;top:50%;transform:translateY(-50%);width:190px;min-height:180px;display:flex;align-items:center;justify-content:center}
+.realistic-table .seat-left{left:0}.realistic-table .seat-right{right:0}
+.realistic-table .center-table{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;gap:18px;min-width:430px;padding:18px;border-radius:22px;background:rgba(8,18,12,.22);box-shadow:inset 0 0 25px rgba(0,0,0,.2)}
+.realistic-table .table-info-zone{display:flex;gap:7px;position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%)}
+.realistic-table .zone-label{font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#e7d6ae}
+.opponent-seat-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;padding:8px 10px;border:1px solid rgba(222,194,132,.2);background:rgba(8,14,10,.58);backdrop-filter:blur(5px);border-radius:14px;min-width:160px;box-shadow:0 10px 22px rgba(0,0,0,.3);transition:.25s}
+.opponent-seat-card.active-turn{border-color:#e3bc58;box-shadow:0 0 0 2px rgba(227,188,88,.18),0 0 25px rgba(227,188,88,.25)}
+.opponent-profile{display:flex;align-items:center;gap:8px;width:100%}
+.opponent-avatar-frame,.profile-avatar-ring{position:relative;width:48px;height:48px;border-radius:50%;padding:2px;background:linear-gradient(145deg,#e3bf63,#806333,#3f9b5d);box-shadow:0 0 0 2px rgba(0,0,0,.55),0 5px 15px rgba(0,0,0,.35)}
+.opponent-avatar-frame img,.profile-avatar-ring img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.opp-meta{display:flex;flex-direction:column;min-width:0}.opp-meta strong{font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.opp-meta span{font-size:.76rem;color:#ded9ca}.opp-meta small{font-size:.67rem;color:#aab4a8}
+.opponent-hand{height:46px;display:flex;justify-content:center;align-items:center;position:relative;width:100%;overflow:visible}
+.opponent-card-back{width:29px;height:42px;border-radius:5px;border:2px solid #e5d8b9;background:repeating-linear-gradient(45deg,#20252a 0,#20252a 4px,#374049 4px,#374049 7px);box-shadow:0 4px 7px rgba(0,0,0,.45);margin-left:-17px;transform:rotate(calc((var(--i) - 4) * 3deg)) translateY(calc(abs(var(--i) - 4) * 1px));}
+.opponent-hand-top .opponent-card-back{transform:rotate(calc((var(--i) - 4) * 3deg)) translateY(0)}
+.seat-left .opponent-seat-card .opponent-hand{order:0}.seat-left .opponent-hand{transform:rotate(90deg)}.seat-right .opponent-hand{transform:rotate(-90deg)}.seat-top .opponent-hand{transform:rotate(180deg)}
+.animated-avatar{animation:avatarFloat 2.8s ease-in-out infinite,avatarGlow 3.2s ease-in-out infinite}
+.avatar-card .avatar-image-wrap{animation:avatarFloat 2.8s ease-in-out infinite}.avatar-card:nth-child(2) .avatar-image-wrap{animation-delay:.3s}.avatar-card:nth-child(3) .avatar-image-wrap{animation-delay:.6s}.avatar-card:nth-child(4) .avatar-image-wrap{animation-delay:.9s}
+@keyframes avatarFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.035)}}
+@keyframes avatarGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(217,164,65,0))}50%{filter:drop-shadow(0 0 8px rgba(217,164,65,.35))}}
+.game-footer{position:relative;z-index:5;background:linear-gradient(180deg,rgba(11,16,13,.97),rgba(8,11,10,.98));border:1px solid rgba(202,180,118,.2);border-radius:18px;padding:9px}
+.game-footer .action-bar{justify-content:center;margin-bottom:0}.hand-panel{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);border-radius:14px}
+.game-bottom-grid{grid-template-columns:minmax(0,1fr) 220px!important;align-items:stretch}
+.compact-chat{min-width:0}.game-chat-box{height:76px!important}.compact-chat .chat-input-row{margin-top:5px}
+.my-hand-zone{display:flex;justify-content:center}
+#my-hand{justify-content:center;overflow-x:auto;padding:9px 14px 4px;min-height:110px}
+#my-hand .uno-card{width:74px;height:112px;font-size:1.12rem;transition:transform .2s,box-shadow .2s}
+#my-hand .uno-card:hover{transform:translateY(-13px) scale(1.04);box-shadow:0 14px 25px rgba(0,0,0,.4)}
+.chat-container{width:min(100%,900px);margin:0 auto}.chat-container .chat-box{height:120px!important}.chat-input-row input{font-size:.95rem!important}
+.host-room-editor{display:flex;gap:7px;align-items:center;margin-top:8px}.host-room-editor input{width:145px;text-transform:uppercase}.host-transfer-notice{padding:8px 12px;border:1px solid rgba(217,164,65,.25);border-radius:10px;background:rgba(217,164,65,.07);font-size:.86rem;color:#e6d5a8}
+#screen-lobby .lobby-chat{max-width:760px;margin:8px auto 0}
+#screen-lobby .lobby-grid{max-width:900px;margin:0 auto}
+#screen-game .turn-indicator-box{min-width:190px}.timer-pill{font-size:.9rem!important}
+@media(max-width:900px){.realistic-table{min-height:440px!important}.realistic-table .opponents-col{width:145px}.opponent-seat-card{min-width:135px}.realistic-table .center-table{min-width:360px}.game-bottom-grid{grid-template-columns:1fr!important}}
+@media(max-width:650px){body{font-size:15px}.realistic-table{min-height:410px!important;border-width:7px}.realistic-table .middle-row{inset:85px 5px 85px}.realistic-table .opponents-col{width:100px}.opponent-seat-card{min-width:100px;padding:5px}.opponent-avatar-frame{width:38px;height:38px}.opp-meta strong{font-size:.72rem}.opp-meta span{font-size:.62rem}.opp-meta small{display:none}.opponent-card-back{width:22px;height:34px;margin-left:-14px}.realistic-table .center-table{min-width:275px;gap:8px;padding:8px}.realistic-table .uno-card{width:58px;height:88px}.realistic-table .table-info-zone{display:none}.realistic-table .opponents-row{width:70%;top:8px}#my-hand .uno-card{width:62px;height:94px}.host-room-editor{flex-wrap:wrap}.host-room-editor input{width:100%}}
+.animated-lobby-avatar{transition:transform .2s}.animated-lobby-avatar:hover{transform:translateY(-4px) scale(1.025)}
+.lobby-avatar-wrap{display:grid;place-items:center;padding:3px;border-radius:50%;background:linear-gradient(145deg,#d9a441,#5b4222,#63c174);box-shadow:0 7px 18px rgba(0,0,0,.3)}
+.lobby-avatar-wrap .lobby-player-avatar{display:block;border-radius:50%;width:58px;height:58px;object-fit:cover}
+.room-copy-btn{border:1px solid rgba(217,164,65,.35);background:rgba(217,164,65,.08);color:#ead9ad;border-radius:7px;padding:4px 7px;cursor:pointer;font-size:.72rem;vertical-align:middle}.room-copy-btn:hover{background:rgba(217,164,65,.18)}
+.lobby-actions{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}.leave-room-btn{opacity:.85}.ui-btn.danger{background:#6d3030;border:1px solid #a64c4c;color:#fff}.ui-btn.danger:hover{background:#843939}
