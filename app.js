@@ -8,20 +8,19 @@ const firebaseConfig = {
   appId: "1:926454626159:web:f1cfb4836a810ac1a91a9a"
 };
 let db = null;
+let auth = null;
 let isFirebaseConnected = false;
+let firebaseReadyPromise = null;
 try {
   if (typeof firebase !== 'undefined') {
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.database();
-    isFirebaseConnected = true;
+    auth = typeof firebase.auth === 'function' ? firebase.auth() : null;
+    firebaseReadyPromise = auth ? auth.signInAnonymously().then(() => { isFirebaseConnected = true; updateFirebaseStatus(); if (document.readyState !== 'loading') initHistory(); }).catch(error => { console.warn('Firebase Auth no disponible:', error); isFirebaseConnected = !!db; updateFirebaseStatus(); if (document.readyState !== 'loading') initHistory(); }) : Promise.resolve(isFirebaseConnected = !!db);
   }
 } catch (e) {
-  console.warn(
-    "Modo local activo.",
-    e
-  );
+  console.warn('Modo local activo.', e);
+  firebaseReadyPromise = Promise.resolve();
 }
 let myPlayerId =
   'p_' +
@@ -80,28 +79,11 @@ const VALUES = [
   '🚫',
   '🔄'
 ];
-window.addEventListener(
-  'beforeunload',
-  () => {
-    if (
-      currentRoomCode &&
-      myPlayerName &&
-      isFirebaseConnected &&
-      db
-    ) {
-      db.ref(
-        `chats/${currentRoomCode}`
-      ).push({
-        sender: 'SISTEMA',
-        text:
-          `${myPlayerName} abandonó la partida.`
-      });
-      db.ref(
-        `rooms/${currentRoomCode}/players/${myPlayerId}`
-      ).remove();
-    }
+window.addEventListener('beforeunload', () => {
+  if (roomRef && currentRoomCode && myPlayerId) {
+    try { roomRef.child(`players/${myPlayerId}`).remove(); } catch (e) {}
   }
-);
+});
 function showToastNotification(message) {
   const toast =
     document.getElementById(
@@ -203,13 +185,24 @@ function initHistory() {
     }
   );
 }
-document.addEventListener(
-  'DOMContentLoaded',
-  () => {
-    initHistory();
-    updateSkillDisplay();
+document.addEventListener('DOMContentLoaded', () => {
+  initHistory();
+  updateSkillDisplay();
+  loadLocalProfile();
+  updateFirebaseStatus();
+});
+function updateFirebaseStatus() {
+  const dot = document.getElementById('firebase-status-dot');
+  const text = document.getElementById('firebase-status-text');
+  if (!dot || !text) return;
+  if (!isFirebaseConnected) {
+    dot.className = 'offline';
+    text.innerText = 'Modo local / servidor no conectado';
+    return;
   }
-);
+  dot.className = 'online';
+  text.innerText = 'Servidor conectado y listo';
+}
 function selectAvatar(
   element,
   url,
@@ -239,6 +232,7 @@ function selectAvatar(
       skillDesc;
   }
   updateSkillDisplay();
+  saveLocalProfile();
 }
 function showScreen(screenId) {
   document
@@ -394,209 +388,217 @@ function generateDeck() {
     () => Math.random() - .5
   );
 }
-function createRoom() {
-  if (!getPlayerName()) {
-    return;
-  }
-  const code =
-    Math.random()
-      .toString(36)
-      .substring(2, 8)
-      .toUpperCase();
+async function createRoom() {
+  if (!getPlayerName()) return;
+  await (firebaseReadyPromise || Promise.resolve());
+  const code = generateRoomCode();
   currentRoomCode = code;
   const initialData = {
     code,
-    host:
-      myPlayerId,
-    status:
-      'waiting',
-    stack:
-      0,
-    activeColor:
-      'rojo',
-    currentTurnIndex:
-      0,
-    turnOrder:
-      [myPlayerId],
-    topCard:
-      null,
-    deck:
-      generateDeck(),
-    winnerName:
-      null,
+    host: myPlayerId,
+    status: 'waiting',
+    stack: 0,
+    activeColor: 'rojo',
+    currentTurnIndex: 0,
+    turnOrder: [myPlayerId],
+    topCard: null,
+    deck: generateDeck(),
+    winnerName: null,
+    createdAt: Date.now(),
     players: {
       [myPlayerId]: {
-        id:
-          myPlayerId,
-        name:
-          myPlayerName,
-        avatar:
-          selectedAvatarUrl,
-        skill:
-          selectedSkill,
-        hand:
-          [],
-        isHost:
-          true,
-        skillUses:
-          MAX_SKILL_USES
+        id: myPlayerId,
+        name: myPlayerName,
+        avatar: selectedAvatarUrl,
+        skill: selectedSkill,
+        hand: [],
+        isHost: true,
+        skillUses: MAX_SKILL_USES
       }
     }
   };
-  if (
-    isFirebaseConnected &&
-    db
-  ) {
-    roomRef =
-      db.ref(
-        'rooms/' + code
-      );
-    roomRef.child('players/'+myPlayerId).onDisconnect().remove();
-    roomRef
-      .set(initialData)
-      .then(
-        () => {
-          listenToRoom();
-          listenToChat();
-          initVoiceSignaling();
-          showScreen(
-            'screen-lobby'
-          );
-        }
-      );
+  if (isFirebaseConnected && db) {
+    try {
+      const ref = db.ref(`rooms/${code}`);
+      const snap = await ref.once('value');
+      if (snap.exists()) return createRoom();
+      await ref.set(initialData);
+      roomRef = ref;
+      await roomRef.child(`players/${myPlayerId}`).onDisconnect().remove().catch(error => console.warn('onDisconnect:', error));
+      savePlayerProfileHistory();
+      listenToRoom();
+      listenToChat();
+      initVoiceSignaling();
+      showScreen('screen-lobby');
+      showToastNotification(`🎮 Sala ${code} creada correctamente.`);
+    } catch (error) {
+      console.error('Error al crear sala:', error);
+      alert(`No se pudo crear la sala. Firebase respondió: ${error?.message || 'error desconocido'}`);
+    }
   } else {
-    currentGameState =
-      initialData;
-    document.getElementById(
-      'lobby-code-display'
-    ).innerText =
-      currentRoomCode;
+    roomRef = null;
+    currentGameState = initialData;
+    savePlayerProfileHistory();
+    showScreen('screen-lobby');
     updateUI();
-    showScreen(
-      'screen-lobby'
-    );
+    showToastNotification(`🎮 Sala local ${code} creada.`);
   }
 }
-function joinRoom() {
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+async function joinRoom() {
   if (!getPlayerName()) return;
-  const input=document.getElementById('room-code-input');
-  const code=input.value.trim().toUpperCase();
-  if (!code) { alert('Por favor ingresa un código válido.'); return; }
-  const enterRoom=ref=>{
-    roomRef=ref;
-    roomRef.child('players/'+myPlayerId).onDisconnect().remove();
-    roomRef.once('value',snapshot=>{
-      if(!snapshot.exists()){ alert('La sala ingresada no existe.'); return; }
-      const data=snapshot.val();
-      const players=data.players||{};
-      if(Object.keys(players).length>=4){ alert('La sala ya está llena.'); return; }
-      currentRoomCode=ref.key;
-      roomRef.child('players/'+myPlayerId).set({id:myPlayerId,name:myPlayerName,avatar:selectedAvatarUrl,skill:selectedSkill,hand:[],isHost:false,skillUses:MAX_SKILL_USES}).then(()=>{
-        savePlayerProfileHistory();
-        listenToRoom();
-        listenToChat();
-        initVoiceSignaling();
-        showScreen('screen-lobby');
-      });
-    });
-  };
-  if(isFirebaseConnected&&db){
-    db.ref('rooms').orderByChild('inviteCode').equalTo(code).once('value',snapshot=>{
-      if(snapshot.exists()){
-        const rooms=snapshot.val();
-        const keys=Object.keys(rooms).filter(k=>(rooms[k].status||'waiting')==='waiting');
-        if(keys.length){ enterRoom(db.ref('rooms/'+keys[0])); return; }
-      }
-      enterRoom(db.ref('rooms/'+code));
-    });
+  await (firebaseReadyPromise || Promise.resolve());
+  const input = document.getElementById('room-code-input');
+  const code = input.value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,6}$/.test(code)) {
+    alert('Ingresa un código de sala de 4 a 6 caracteres.');
+    return;
   }
-}
-function ensureHostOwnership(activePlayers){
-  if(!currentGameState||currentGameState.status!=='waiting'||!isFirebaseConnected||!roomRef)return;
-  const host=currentGameState.host;
-  if(host&&activePlayers[host])return;
-  const ids=Object.keys(activePlayers).sort();
-  if(!ids.length)return;
-  const nextHost=ids[0];
-  roomRef.child('host').transaction(value=>value||nextHost).then(result=>{
-    if(result.committed&&result.snapshot.val()===nextHost){
-      roomRef.child('players/'+nextHost+'/isHost').set(true);
-      if(nextHost===myPlayerId)showToastNotification('👑 Ahora eres el anfitrión.');
+  if (!isFirebaseConnected || !db) {
+    alert('El servidor todavía no está conectado. Espera un momento y vuelve a intentarlo.');
+    return;
+  }
+  try {
+    const ref = db.ref(`rooms/${code}`);
+    const snapshot = await ref.once('value');
+    if (!snapshot.exists()) {
+      alert('La sala ingresada no existe.');
+      return;
     }
-  });
-}
-function copyInviteCode(){
-  const code=currentGameState?.inviteCode||currentRoomCode;
-  if(!code)return;
-  if(navigator.clipboard){navigator.clipboard.writeText(code).then(()=>showToastNotification('📋 Código copiado.'));}
-  else showToastNotification('Código: '+code);
-}
-function leaveRoom(){
-  if(!currentRoomCode){showScreen('screen-setup');return;}
-  const ref=roomRef;
-  const code=currentRoomCode;
-  if(isFirebaseConnected&&db&&ref){
-    ref.child('players/'+myPlayerId).remove().then(()=>{
-      showToastNotification('Has salido de la sala.');
-      if(chatRef)chatRef.off();
-      ref.off();
-      roomRef=null; chatRef=null; currentRoomCode=null; currentGameState=null; knownPlayers={};
-      showScreen('screen-setup');
-    });
-  }else{
-    roomRef=null; currentRoomCode=null; currentGameState=null; showScreen('screen-setup');
+    const state = snapshot.val();
+    const players = state.players || {};
+    if (Object.keys(players).length >= 4) {
+      alert('La sala ya está llena.');
+      return;
+    }
+    if (state.status === 'finished') {
+      alert('Esa sala terminó la partida. Crea una nueva sala.');
+      return;
+    }
+    currentRoomCode = code;
+    roomRef = ref;
+    await roomRef.child(`players/${myPlayerId}`).set({ id: myPlayerId, name: myPlayerName, avatar: selectedAvatarUrl, skill: selectedSkill, hand: [], isHost: false, skillUses: MAX_SKILL_USES });
+    await roomRef.child(`players/${myPlayerId}`).onDisconnect().remove().catch(error => console.warn('onDisconnect:', error));
+    savePlayerProfileHistory();
+    listenToRoom();
+    listenToChat();
+    initVoiceSignaling();
+    showScreen('screen-lobby');
+    showToastNotification(`✅ Entraste a la sala ${code}.`);
+  } catch (error) {
+    console.error('Error al unirse:', error);
+    alert(`No se pudo entrar a la sala: ${error?.message || 'error desconocido'}`);
   }
 }
 function listenToRoom() {
-  const codeDisplay =
-    document.getElementById(
-      'lobby-code-display'
-    );
-  if (codeDisplay) {
-    codeDisplay.innerText = currentGameState.inviteCode || currentRoomCode;
-  }
-  if (!roomRef) {
-    return;
-  }
-  roomRef.on(
-    'value',
-    snapshot => {
-      if (!snapshot.exists()) {
-        return;
-      }
-      currentGameState =
-        snapshot.val();
-      const activePlayers =
-        currentGameState.players ||
-        {};
-      ensureHostOwnership(activePlayers);
-      Object.keys(
-        knownPlayers
-      ).forEach(
-        playerId => {
-          if (
-            !activePlayers[playerId]
-          ) {
-            showToastNotification(
-              `${knownPlayers[playerId]} abandonó la partida`
-            );
-          }
-        }
-      );
-      knownPlayers = {};
-      Object.values(
-        activePlayers
-      ).forEach(
-        player => {
-          knownPlayers[
-            player.id
-          ] =
-            player.name;
-        }
-      );
-      updateUI();
+  const codeDisplay = document.getElementById('lobby-code-display');
+  if (codeDisplay) codeDisplay.innerText = currentRoomCode || '------';
+  if (!roomRef) return;
+  roomRef.off('value');
+  roomRef.on('value', snapshot => {
+    if (!snapshot.exists()) {
+      showToastNotification('⚠️ La sala ya no existe.');
+      returnToSetup();
+      return;
     }
-  );
+    const previous = currentGameState?.players || {};
+    currentGameState = snapshot.val();
+    if (currentGameState.redirectCode && currentGameState.redirectCode !== currentRoomCode) {
+      const newCode = currentGameState.redirectCode;
+      const newRef = db.ref(`rooms/${newCode}`);
+      newRef.once('value').then(newSnap => {
+        if (newSnap.exists() && newSnap.val().players?.[myPlayerId]) {
+          if (roomRef) roomRef.off();
+          currentRoomCode = newCode;
+          roomRef = newRef;
+          listenToRoom();
+          listenToChat();
+          showToastNotification(`🔑 La sala cambió de código a ${newCode}.`);
+          const display = document.getElementById('lobby-code-display');
+          if (display) display.innerText = newCode;
+        }
+      });
+      return;
+    }
+    const activePlayers = currentGameState.players || {};
+    Object.keys(previous).forEach(playerId => {
+      if (!activePlayers[playerId]) showToastNotification(`${previous[playerId].name || 'Un jugador'} abandonó la sala.`);
+    });
+    knownPlayers = {};
+    Object.values(activePlayers).forEach(player => { knownPlayers[player.id] = player.name; });
+    ensureHost();
+    updateUI();
+  });
+}
+async function ensureHost() {
+  if (!roomRef || !currentGameState) return;
+  const players = currentGameState.players || {};
+  const ids = Object.keys(players);
+  if (!ids.length) return;
+  if (currentGameState.host && players[currentGameState.host]) return;
+  const nextHost = ids.slice().sort()[0];
+  try {
+    await roomRef.child('host').transaction(current => current && players[current] ? current : nextHost);
+    const fresh = (await roomRef.once('value')).val();
+    if (fresh?.host) {
+      const updates = {};
+      Object.keys(fresh.players || {}).forEach(id => { updates[`players/${id}/isHost`] = id === fresh.host; });
+      await roomRef.update(updates);
+      if (fresh.host === myPlayerId) showToastNotification('👑 Ahora eres el anfitrión de la sala.');
+    }
+  } catch (error) { console.warn('No se pudo reasignar anfitrión:', error); }
+}
+function returnToSetup() {
+  if (roomRef) roomRef.off();
+  currentRoomCode = null;
+  roomRef = null;
+  currentGameState = null;
+  showScreen('screen-setup');
+}
+function copyRoomCode() {
+  if (!currentRoomCode) return;
+  navigator.clipboard?.writeText(currentRoomCode).then(() => showToastNotification('📋 Código copiado.')).catch(() => alert(`Código: ${currentRoomCode}`));
+}
+async function changeRoomCode() {
+  if (!currentGameState || currentGameState.host !== myPlayerId || !roomRef || !db) return;
+  const nextCode = prompt('Nuevo código de invitación (4 a 6 caracteres):', currentRoomCode);
+  if (nextCode === null) return;
+  const clean = nextCode.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,6}$/.test(clean)) { alert('El código debe tener 4 a 6 caracteres.'); return; }
+  if (clean === currentRoomCode) return;
+  try {
+    const oldCode = currentRoomCode;
+    const oldRef = roomRef;
+    const newRef = db.ref(`rooms/${clean}`);
+    if ((await newRef.once('value')).exists()) { alert('Ese código ya está ocupado.'); return; }
+    const copy = JSON.parse(JSON.stringify(currentGameState));
+    delete copy.redirectCode;
+    copy.code = clean;
+    await newRef.set(copy);
+    await oldRef.update({redirectCode: clean});
+    currentRoomCode = clean;
+    roomRef = newRef;
+    await roomRef.child(`players/${myPlayerId}`).onDisconnect().remove().catch(()=>{});
+    listenToRoom();
+    listenToChat();
+    const display = document.getElementById('lobby-code-display');
+    if (display) display.innerText = clean;
+    showToastNotification(`🔑 Código cambiado a ${clean}.`);
+    setTimeout(() => oldRef.remove().catch(()=>{}), 10000);
+  } catch (error) { console.error(error); alert(`No se pudo cambiar el código: ${error?.message || 'error desconocido'}`); }
+}
+async function leaveRoom() {
+  if (!currentRoomCode) return;
+  if (!confirm('¿Quieres salir de la sala?')) return;
+  try {
+    if (roomRef) await roomRef.child(`players/${myPlayerId}`).remove();
+  } catch (error) { console.warn(error); }
+  returnToSetup();
 }
 function listenToChat() {
   if (
@@ -1239,31 +1241,26 @@ function renderGameBoard() {
   updateSkillDisplay();
 }
 function renderOpponentsQuadrant(turnPlayerId) {
-  const zoneTop=document.getElementById('opponents-top');
-  const zoneLeft=document.getElementById('opponents-left');
-  const zoneRight=document.getElementById('opponents-right');
-  if(!zoneTop||!zoneLeft||!zoneRight)return;
-  zoneTop.innerHTML=''; zoneLeft.innerHTML=''; zoneRight.innerHTML='';
-  const order=currentGameState.turnOrder||Object.keys(currentGameState.players||{});
-  const myIndex=Math.max(0,order.indexOf(myPlayerId));
-  const positions=['left','top','right'];
-  order.forEach((id,relative)=>{
-    if(id===myPlayerId)return;
-    const player=currentGameState.players?.[id];
-    if(!player)return;
-    const step=(relative-myIndex+order.length)%order.length;
-    const position=positions[step-1];
-    if(!position)return;
-    const isTurn=player.id===turnPlayerId;
-    const cardCount=player.hand?player.hand.length:0;
-    const cards=Math.min(cardCount,10);
-    const hand=Array.from({length:cards},(_,i)=>`<span class="opponent-card-back" style="--i:${i}"></span>`).join('');
-    const oppEl=document.createElement('div');
-    oppEl.className=`opponent-seat-card ${isTurn?'active-turn':''}`;
-    oppEl.innerHTML=`<div class="opponent-hand opponent-hand-${position}">${hand}</div><div class="opponent-profile"><div class="opponent-avatar-frame"><img src="${player.avatar||'./assets/foto1.jpeg'}" class="opp-avatar animated-avatar" alt="${player.name}"><span class="online-dot"></span></div><div class="opp-meta"><strong>${player.name}</strong><span>${cardCount} cartas</span><small>${player.skill||''}</small></div></div>`;
-    if(position==='left')zoneLeft.appendChild(oppEl);
-    else if(position==='right')zoneRight.appendChild(oppEl);
-    else zoneTop.appendChild(oppEl);
+  const zoneTop = document.getElementById('opponents-top');
+  const zoneLeft = document.getElementById('opponents-left');
+  const zoneRight = document.getElementById('opponents-right');
+  if (!zoneTop || !zoneLeft || !zoneRight) return;
+  zoneTop.innerHTML = '';
+  zoneLeft.innerHTML = '';
+  zoneRight.innerHTML = '';
+  const opponents = Object.values(currentGameState.players || {}).filter(player => player.id !== myPlayerId);
+  const zones = [zoneLeft, zoneTop, zoneRight];
+  const positions = ['left', 'top', 'right'];
+  opponents.slice(0,3).forEach((player,index) => {
+    const isTurn = player.id === turnPlayerId;
+    const hand = player.hand || [];
+    const cardCount = hand.length;
+    const oppEl = document.createElement('div');
+    oppEl.className = `opponent-mini-card position-${positions[index]} ${isTurn ? 'active-turn' : ''}`;
+    const visibleCount = Math.min(cardCount, 7);
+    const backs = Array.from({length: visibleCount}, (_,i) => `<span class="mini-card-back" style="--i:${i}"></span>`).join('');
+    oppEl.innerHTML = `<img src="${player.avatar || './assets/foto1.jpeg'}" class="opp-avatar" alt="${player.name || 'Jugador'}"><div class="opp-name">${player.name || 'Jugador'}</div><div class="opponent-cards">${backs}</div><div class="opp-card-count">${cardCount} ${cardCount===1?'carta':'cartas'}${isTurn?' · SU TURNO':''}</div>`;
+    zones[index].appendChild(oppEl);
   });
 }
 function renderMyHand(
