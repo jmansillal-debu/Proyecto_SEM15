@@ -463,6 +463,7 @@ function listenToRoom(){
     if(!snapshot.exists()){showScreen('screen-setup');showToastNotification('⚠️ La sala ya no existe.');return;}
     currentGameState=snapshot.val();const activePlayers=currentGameState.players||{};
     Object.keys(knownPlayers).forEach(playerId=>{if(!activePlayers[playerId])showToastNotification(`${knownPlayers[playerId]} abandonó la partida`);});
+    Object.values(activePlayers).forEach(player=>{if(knownPlayers[player.id]===undefined&&player.id!==myPlayerId&&Object.keys(knownPlayers).length>0)showToastNotification(`👋 ${player.name} se unió a la sala`);});
     knownPlayers={};Object.values(activePlayers).forEach(player=>knownPlayers[player.id]=player.name);attachPlayerDisconnect();ensureHost();updateUI();
   });
 }
