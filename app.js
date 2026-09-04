@@ -8,23 +8,19 @@ const firebaseConfig = {
   appId: "1:926454626159:web:f1cfb4836a810ac1a91a9a"
 };
 let db = null;
-let isFirebaseConnected = false;
 let auth = null;
-let firebaseReadyPromise = Promise.resolve();
+let isFirebaseConnected = false;
+let firebaseReadyPromise = null;
 try {
   if (typeof firebase !== 'undefined') {
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.database();
     auth = typeof firebase.auth === 'function' ? firebase.auth() : null;
-    firebaseReadyPromise = auth ? auth.signInAnonymously().then(() => { isFirebaseConnected = true; updateFirebaseStatus(); if (document.readyState !== 'loading') initHistory(); }).catch(error => { console.warn('Autenticación anónima no disponible:', error); isFirebaseConnected = !!db; updateFirebaseStatus(); if (document.readyState !== 'loading') initHistory(); }) : Promise.resolve(isFirebaseConnected = !!db);
+    firebaseReadyPromise = auth ? auth.signInAnonymously().then(() => { isFirebaseConnected = true; updateFirebaseStatus(); if (document.readyState !== 'loading') initHistory(); }).catch(error => { console.warn('Firebase Auth no disponible:', error); isFirebaseConnected = !!db; updateFirebaseStatus(); if (document.readyState !== 'loading') initHistory(); }) : Promise.resolve(isFirebaseConnected = !!db);
   }
 } catch (e) {
-  console.warn(
-    "Modo local activo.",
-    e
-  );
+  console.warn('Modo local activo.', e);
+  firebaseReadyPromise = Promise.resolve();
 }
 let myPlayerId =
   'p_' +
@@ -44,13 +40,8 @@ let currentGameState = null;
 let knownPlayers = {};
 let llamaClicks = 0;
 let loroClicks = 0;
-const LORO_REQUIRED_CLICKS = 5;
-const LLAMA_REQUIRED_CLICKS = 6;
-const HAND_HELP_THRESHOLD = 15;
-let chatListeningAt = Date.now();
-let chatUnread = 0;
-let historyInitialized = false;
-let chatPriming = true;
+const LORO_REQUIRED_CLICKS = 10;
+const LLAMA_REQUIRED_CLICKS = 40;
 let turnTimer = null;
 let timeLeft = 10;
 let pendingWildCard = null;
@@ -72,7 +63,6 @@ const COLORS = [
   'verde',
   'amarillo'
 ];
-function updateFirebaseStatus(){const dot=document.getElementById('firebase-status-dot');const text=document.getElementById('firebase-status-text');if(dot)dot.classList.toggle('online',isFirebaseConnected);if(text)text.innerText=isFirebaseConnected?'Servidor conectado':'Servidor no autenticado / modo local';}
 const VALUES = [
   '0',
   '1',
@@ -89,28 +79,11 @@ const VALUES = [
   '🚫',
   '🔄'
 ];
-window.addEventListener(
-  'beforeunload',
-  () => {
-    if (
-      currentRoomCode &&
-      myPlayerName &&
-      isFirebaseConnected &&
-      db
-    ) {
-      db.ref(
-        `chats/${currentRoomCode}`
-      ).push({
-        sender: 'SISTEMA',
-        text:
-          `${myPlayerName} abandonó la partida.`
-      });
-      db.ref(
-        `rooms/${currentRoomCode}/players/${myPlayerId}`
-      ).remove();
-    }
+window.addEventListener('beforeunload', () => {
+  if (roomRef && currentRoomCode && myPlayerId) {
+    try { roomRef.child(`players/${myPlayerId}`).remove(); } catch (e) {}
   }
-);
+});
 function showToastNotification(message) {
   const toast =
     document.getElementById(
@@ -137,14 +110,12 @@ function showToastNotification(message) {
   );
 }
 function initHistory() {
-  if (historyInitialized) return;
   if (
     !isFirebaseConnected ||
     !db
   ) {
     return;
   }
-  historyInitialized = true;
   db.ref(
     'history/winners'
   ).on(
@@ -214,15 +185,24 @@ function initHistory() {
     }
   );
 }
-document.addEventListener(
-  'DOMContentLoaded',
-  () => {
-    initHistory();
-    loadLocalProfile();
-    updateSkillDisplay();
-    updateFirebaseStatus();
+document.addEventListener('DOMContentLoaded', () => {
+  initHistory();
+  updateSkillDisplay();
+  loadLocalProfile();
+  updateFirebaseStatus();
+});
+function updateFirebaseStatus() {
+  const dot = document.getElementById('firebase-status-dot');
+  const text = document.getElementById('firebase-status-text');
+  if (!dot || !text) return;
+  if (!isFirebaseConnected) {
+    dot.className = 'offline';
+    text.innerText = 'Modo local / servidor no conectado';
+    return;
   }
-);
+  dot.className = 'online';
+  text.innerText = 'Servidor conectado y listo';
+}
 function selectAvatar(
   element,
   url,
@@ -242,7 +222,6 @@ function selectAvatar(
   );
   selectedAvatarUrl = url;
   selectedSkill = skillName;
-  saveLocalProfile();
   const description =
     document.getElementById(
       'skill-description'
@@ -253,14 +232,22 @@ function selectAvatar(
       skillDesc;
   }
   updateSkillDisplay();
-  updateMatchSkillPanel();
+  saveLocalProfile();
 }
 function showScreen(screenId) {
-  document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
-  document.getElementById(screenId)?.classList.add('active');
-  const chatToggle=document.getElementById('chat-bubble-toggle');
-  if(chatToggle) chatToggle.classList.toggle('hidden',screenId!=='screen-lobby'&&screenId!=='screen-game');
-  if(screenId!=='screen-lobby'&&screenId!=='screen-game'){chatUnread=0;updateChatBadge();}
+  document
+    .querySelectorAll('.screen')
+    .forEach(
+      screen =>
+        screen.classList.remove(
+          'active'
+        )
+    );
+  document
+    .getElementById(screenId)
+    ?.classList.add(
+      'active'
+    );
   const petsLayer =
     document.getElementById(
       'pets-roaming-layer'
@@ -401,117 +388,384 @@ function generateDeck() {
     () => Math.random() - .5
   );
 }
+async function createRoom() {
+  if (!getPlayerName()) return;
+  await (firebaseReadyPromise || Promise.resolve());
+  const code = generateRoomCode();
+  currentRoomCode = code;
+  const initialData = {
+    code,
+    host: myPlayerId,
+    status: 'waiting',
+    stack: 0,
+    activeColor: 'rojo',
+    currentTurnIndex: 0,
+    turnOrder: [myPlayerId],
+    topCard: null,
+    deck: generateDeck(),
+    winnerName: null,
+    createdAt: Date.now(),
+    players: {
+      [myPlayerId]: {
+        id: myPlayerId,
+        name: myPlayerName,
+        avatar: selectedAvatarUrl,
+        skill: selectedSkill,
+        hand: [],
+        isHost: true,
+        skillUses: MAX_SKILL_USES
+      }
+    }
+  };
+  if (isFirebaseConnected && db) {
+    try {
+      const ref = db.ref(`rooms/${code}`);
+      const snap = await ref.once('value');
+      if (snap.exists()) return createRoom();
+      await ref.set(initialData);
+      roomRef = ref;
+      await roomRef.child(`players/${myPlayerId}`).onDisconnect().remove().catch(error => console.warn('onDisconnect:', error));
+      savePlayerProfileHistory();
+      listenToRoom();
+      listenToChat();
+      initVoiceSignaling();
+      showScreen('screen-lobby');
+      showToastNotification(`🎮 Sala ${code} creada correctamente.`);
+    } catch (error) {
+      console.error('Error al crear sala:', error);
+      alert(`No se pudo crear la sala. Firebase respondió: ${error?.message || 'error desconocido'}`);
+    }
+  } else {
+    roomRef = null;
+    currentGameState = initialData;
+    savePlayerProfileHistory();
+    showScreen('screen-lobby');
+    updateUI();
+    showToastNotification(`🎮 Sala local ${code} creada.`);
+  }
+}
 function generateRoomCode() {
-  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code='';
-  for(let i=0;i<6;i++)code+=chars[Math.floor(Math.random()*chars.length)];
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
-function attachPlayerDisconnect(){
-  if(roomRef&&myPlayerId)roomRef.child(`players/${myPlayerId}`).onDisconnect().remove().catch(()=>{});
+async function joinRoom() {
+  if (!getPlayerName()) return;
+  await (firebaseReadyPromise || Promise.resolve());
+  const input = document.getElementById('room-code-input');
+  const code = input.value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,6}$/.test(code)) {
+    alert('Ingresa un código de sala de 4 a 6 caracteres.');
+    return;
+  }
+  if (!isFirebaseConnected || !db) {
+    alert('El servidor todavía no está conectado. Espera un momento y vuelve a intentarlo.');
+    return;
+  }
+  try {
+    const ref = db.ref(`rooms/${code}`);
+    const snapshot = await ref.once('value');
+    if (!snapshot.exists()) {
+      alert('La sala ingresada no existe.');
+      return;
+    }
+    const state = snapshot.val();
+    const players = state.players || {};
+    if (Object.keys(players).length >= 4) {
+      alert('La sala ya está llena.');
+      return;
+    }
+    if (state.status === 'finished') {
+      alert('Esa sala terminó la partida. Crea una nueva sala.');
+      return;
+    }
+    currentRoomCode = code;
+    roomRef = ref;
+    await roomRef.child(`players/${myPlayerId}`).set({ id: myPlayerId, name: myPlayerName, avatar: selectedAvatarUrl, skill: selectedSkill, hand: [], isHost: false, skillUses: MAX_SKILL_USES });
+    await roomRef.child(`players/${myPlayerId}`).onDisconnect().remove().catch(error => console.warn('onDisconnect:', error));
+    savePlayerProfileHistory();
+    listenToRoom();
+    listenToChat();
+    initVoiceSignaling();
+    showScreen('screen-lobby');
+    showToastNotification(`✅ Entraste a la sala ${code}.`);
+  } catch (error) {
+    console.error('Error al unirse:', error);
+    alert(`No se pudo entrar a la sala: ${error?.message || 'error desconocido'}`);
+  }
 }
-function createRoom(){
-  if(!getPlayerName())return;
-  if(!isFirebaseConnected&&db){firebaseReadyPromise.then(()=>createRoom()).catch(()=>{});return;}
-  const code=generateRoomCode();
-  currentRoomCode=code;
-  const initialData={code,roomId:code,host:myPlayerId,status:'waiting',stack:0,activeColor:'rojo',currentTurnIndex:0,turnOrder:[myPlayerId],topCard:null,deck:generateDeck(),winnerName:null,players:{[myPlayerId]:{id:myPlayerId,name:myPlayerName,avatar:selectedAvatarUrl,skill:selectedSkill,hand:[],isHost:true,skillUses:MAX_SKILL_USES}}};
-  const finish=()=>{attachPlayerDisconnect();listenToRoom();listenToChat();initVoiceSignaling();savePlayerProfileHistory();showScreen('screen-lobby');showToastNotification(`🎮 Sala ${code} creada.`);};
-  if(isFirebaseConnected&&db){roomRef=db.ref(`rooms/${code}`);roomRef.set(initialData).then(()=>db.ref(`roomCodes/${code}`).set(code)).then(finish).catch(error=>{console.error(error);alert(`No se pudo crear la sala. Firebase respondió: ${error.message||error.code||'error desconocido'}`);});}
-  else{currentGameState=initialData;updateUI();showScreen('screen-lobby');}
-}
-function resolveRoomCode(code){
-  const clean=String(code||'').trim().toUpperCase();
-  return db.ref(`rooms/${clean}`).once('value').then(snapshot=>{
-    if(snapshot.exists() && String(snapshot.val().code||'').toUpperCase()===clean)return{key:clean,data:snapshot.val()};
-    return db.ref(`roomCodes/${clean}`).once('value').then(alias=>{
-      const key=alias.val();
-      if(!key)return null;
-      return db.ref(`rooms/${key}`).once('value').then(room=>{
-        if(!room.exists())return null;
-        const data=room.val();
-        return String(data.code||'').toUpperCase()===clean?{key,data}:null;
-      });
-    });
-  });
-}
-function joinRoom(){
-  if(!getPlayerName())return;
-  const input=document.getElementById('room-code-input');
-  const code=input?.value.trim().toUpperCase();
-  if(!/^[A-Z0-9]{6}$/.test(code||'')){alert('Ingresa un código de 6 caracteres.');return;}
-  const join=()=>resolveRoomCode(code).then(result=>{
-    if(!result)throw new Error('La sala ingresada no existe.');
-    const players=result.data.players||{};
-    if(Object.keys(players).length>=4)throw new Error('La sala ya está llena.');
-    currentRoomCode=result.key;roomRef=db.ref(`rooms/${result.key}`);
-    return roomRef.child(`players/${myPlayerId}`).set({id:myPlayerId,name:myPlayerName,avatar:selectedAvatarUrl,skill:selectedSkill,hand:[],isHost:false,skillUses:MAX_SKILL_USES}).then(()=>{attachPlayerDisconnect();listenToRoom();listenToChat();initVoiceSignaling();savePlayerProfileHistory();showScreen('screen-lobby');});
-  }).catch(error=>{console.error(error);alert(error.message||'No se pudo entrar a la sala.');});
-  if(isFirebaseConnected&&db)firebaseReadyPromise.then(join);else alert('Firebase no está conectado.');
-}
-function ensureHost(){
-  if(!roomRef||!currentGameState?.players)return;
-  const players=currentGameState.players;const ids=Object.keys(players).filter(id=>players[id]);
-  if(!ids.length)return;if(currentGameState.host&&players[currentGameState.host])return;
-  const newHost=ids.sort()[0];
-  roomRef.child('host').transaction(current=>current&&players[current]?undefined:newHost).then(result=>{if(result.committed&&result.snapshot.val()===newHost){const updates={};ids.forEach(id=>updates[`players/${id}/isHost`]=id===newHost);return roomRef.update(updates);}}).catch(error=>console.warn('No se pudo transferir el anfitrión:',error));
-}
-function listenToRoom(){
-  const codeDisplay=document.getElementById('lobby-code-display');if(codeDisplay)codeDisplay.innerText=currentGameState?.code||currentRoomCode;if(!roomRef)return;
+function listenToRoom() {
+  const codeDisplay = document.getElementById('lobby-code-display');
+  if (codeDisplay) codeDisplay.innerText = currentRoomCode || '------';
+  if (!roomRef) return;
   roomRef.off('value');
-  roomRef.on('value',snapshot=>{
-    if(!snapshot.exists()){showScreen('screen-setup');showToastNotification('⚠️ La sala ya no existe.');return;}
-    currentGameState=snapshot.val();const activePlayers=currentGameState.players||{};
-    Object.keys(knownPlayers).forEach(playerId=>{if(!activePlayers[playerId])showToastNotification(`${knownPlayers[playerId]} abandonó la partida`);});
-    Object.values(activePlayers).forEach(player=>{if(knownPlayers[player.id]===undefined&&player.id!==myPlayerId&&Object.keys(knownPlayers).length>0)showToastNotification(`👋 ${player.name} se unió a la sala`);});
-    knownPlayers={};Object.values(activePlayers).forEach(player=>knownPlayers[player.id]=player.name);attachPlayerDisconnect();ensureHost();updateUI();
+  roomRef.on('value', snapshot => {
+    if (!snapshot.exists()) {
+      showToastNotification('⚠️ La sala ya no existe.');
+      returnToSetup();
+      return;
+    }
+    const previous = currentGameState?.players || {};
+    currentGameState = snapshot.val();
+    if (currentGameState.redirectCode && currentGameState.redirectCode !== currentRoomCode) {
+      const newCode = currentGameState.redirectCode;
+      const newRef = db.ref(`rooms/${newCode}`);
+      newRef.once('value').then(newSnap => {
+        if (newSnap.exists() && newSnap.val().players?.[myPlayerId]) {
+          if (roomRef) roomRef.off();
+          currentRoomCode = newCode;
+          roomRef = newRef;
+          listenToRoom();
+          listenToChat();
+          showToastNotification(`🔑 La sala cambió de código a ${newCode}.`);
+          const display = document.getElementById('lobby-code-display');
+          if (display) display.innerText = newCode;
+        }
+      });
+      return;
+    }
+    const activePlayers = currentGameState.players || {};
+    Object.keys(previous).forEach(playerId => {
+      if (!activePlayers[playerId]) showToastNotification(`${previous[playerId].name || 'Un jugador'} abandonó la sala.`);
+    });
+    knownPlayers = {};
+    Object.values(activePlayers).forEach(player => { knownPlayers[player.id] = player.name; });
+    ensureHost();
+    updateUI();
   });
 }
-function copyRoomCode(){
-  const code=currentGameState?.code||currentRoomCode;if(!code)return;
-  const done=()=>showToastNotification(`📋 Código ${code} copiado.`);
-  if(navigator.clipboard?.writeText)navigator.clipboard.writeText(code).then(done).catch(()=>fallbackCopy(code));else fallbackCopy(code);
+async function ensureHost() {
+  if (!roomRef || !currentGameState) return;
+  const players = currentGameState.players || {};
+  const ids = Object.keys(players);
+  if (!ids.length) return;
+  if (currentGameState.host && players[currentGameState.host]) return;
+  const nextHost = ids.slice().sort()[0];
+  try {
+    await roomRef.child('host').transaction(current => current && players[current] ? current : nextHost);
+    const fresh = (await roomRef.once('value')).val();
+    if (fresh?.host) {
+      const updates = {};
+      Object.keys(fresh.players || {}).forEach(id => { updates[`players/${id}/isHost`] = id === fresh.host; });
+      await roomRef.update(updates);
+      if (fresh.host === myPlayerId) showToastNotification('👑 Ahora eres el anfitrión de la sala.');
+    }
+  } catch (error) { console.warn('No se pudo reasignar anfitrión:', error); }
 }
-function fallbackCopy(code){const temp=document.createElement('textarea');temp.value=code;document.body.appendChild(temp);temp.select();try{document.execCommand('copy');}catch(e){}temp.remove();showToastNotification(`📋 Código ${code} copiado.`);}
-function changeRoomCode(){
-  if(!currentGameState||currentGameState.host!==myPlayerId||!roomRef||!db){showToastNotification('⚠️ Solo el anfitrión puede editar el código.');return;}
-  const current=String(currentGameState.code||currentRoomCode).toUpperCase();
-  const next=prompt('Personaliza el nuevo código de la sala (6 caracteres):',current);
-  if(next===null)return;
-  const clean=next.trim().toUpperCase();
-  if(!/^[A-Z0-9]{6}$/.test(clean)){alert('El código debe tener exactamente 6 caracteres.');return;}
-  if(clean===current){showToastNotification('ℹ️ El código no cambió.');return;}
-  Promise.all([db.ref(`rooms/${clean}`).once('value'),db.ref(`roomCodes/${clean}`).once('value')]).then(([roomSnap,aliasSnap])=>{
-    if(roomSnap.exists()||aliasSnap.exists())throw new Error('Ese código ya está ocupado. Elige otro.');
-    const oldCode=currentGameState.code||currentRoomCode;
-    const updates={};
-    updates[`roomCodes/${clean}`]=currentRoomCode;
-    updates[`roomCodes/${oldCode}`]=null;
-    updates[`rooms/${currentRoomCode}/code`]=clean;
-    updates[`rooms/${currentRoomCode}/roomCode`]=clean;
-    return db.ref().update(updates);
-  }).then(()=>{
-    currentGameState.code=clean;
-    currentGameState.roomCode=clean;
-    const display=document.getElementById('lobby-code-display');
-    if(display)display.innerText=clean;
-    showToastNotification(`✏️ Código cambiado a ${clean}. Todos siguen dentro de la misma sala.`);
-    updateUI();
-  }).catch(error=>alert(error.message||'No se pudo cambiar el código.'));
+function returnToSetup() {
+  if (roomRef) roomRef.off();
+  currentRoomCode = null;
+  roomRef = null;
+  currentGameState = null;
+  showScreen('screen-setup');
 }
-function leaveRoom(){if(roomRef&&myPlayerId)roomRef.child(`players/${myPlayerId}`).remove().catch(()=>{});if(chatRef)chatRef.off();roomRef=null;chatRef=null;currentRoomCode=null;currentGameState=null;knownPlayers={};resetPetCounters();showScreen('screen-setup');}
-function returnToSetup(){leaveRoom();}
-function updateChatBadge(){const badge=document.getElementById('chat-unread-badge');if(badge){badge.innerText=chatUnread>9?'9+':chatUnread;badge.classList.toggle('hidden',chatUnread===0);}}
-function toggleChatBubble(){const activeScreen=document.querySelector('.screen.active');const panel=activeScreen?.querySelector('.lobby-chat,.compact-chat');if(!panel)return;panel.classList.toggle('chat-open');if(panel.classList.contains('chat-open')){chatUnread=0;updateChatBadge();(panel.querySelector('input')||document.getElementById('l4d-chat-input'))?.focus();}}
-function notifyIncomingChat(msgData){if(!msgData||msgData.sender===myPlayerName||msgData.sender==='SISTEMA')return;chatUnread++;updateChatBadge();showToastNotification(`💬 ${msgData.sender}: ${msgData.text}`);}
-function listenToChat(){if(!currentRoomCode||!isFirebaseConnected||!db)return;if(chatRef)chatRef.off();chatListeningAt=Date.now();chatPriming=true;chatRef=db.ref(`chats/${currentRoomCode}`);chatRef.on('child_added',snapshot=>{const msgData=snapshot.val()||{};renderL4DMessage(msgData);renderLobbyMessage(msgData);if(!chatPriming&&msgData.sender!==myPlayerName)notifyIncomingChat(msgData);if(msgData.sender==='SISTEMA'&&msgData.text?.includes('abandonó'))showToastNotification(msgData.text);});chatRef.once('value').then(()=>{setTimeout(()=>chatPriming=false,150);});}
-function sendChatReaction(reaction){if(!currentRoomCode)return;pushChatMessage(reaction);}
-function pushChatMessage(text){if(!text||!currentRoomCode)return;const data={sender:myPlayerName,text,createdAt:firebase.database.ServerValue.TIMESTAMP};if(isFirebaseConnected&&db)db.ref(`chats/${currentRoomCode}`).push(data);else{renderL4DMessage(data);renderLobbyMessage(data);}}
-function handleLobbyChatKey(event){if(event.key!=='Enter')return;const input=document.getElementById('lobby-chat-input');const text=input?.value.trim();if(!text)return;pushChatMessage(text);input.value='';}
-function renderLobbyMessage(msgData){const container=document.getElementById('lobby-chat-messages');if(!container)return;const msgEl=document.createElement('div');msgEl.className='chat-msg';msgEl.innerHTML=`<b>${escapeHtml(msgData.sender||'Jugador')}:</b> ${escapeHtml(msgData.text||'')}`;container.appendChild(msgEl);container.scrollTop=container.scrollHeight;}
-function handleChatKey(event){if(event.key!=='Enter')return;const input=document.getElementById('l4d-chat-input');const text=input?.value.trim();if(!text)return;pushChatMessage(text);input.value='';}
-function renderL4DMessage(msgData){const container=document.getElementById('l4d-chat-messages');if(!container)return;const msgEl=document.createElement('div');msgEl.className='chat-msg';msgEl.innerHTML=`<b>${escapeHtml(msgData.sender||'Jugador')}:</b> ${escapeHtml(msgData.text||'')}`;container.appendChild(msgEl);container.scrollTop=container.scrollHeight;}
-function escapeHtml(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));}
+function copyRoomCode() {
+  if (!currentRoomCode) return;
+  navigator.clipboard?.writeText(currentRoomCode).then(() => showToastNotification('📋 Código copiado.')).catch(() => alert(`Código: ${currentRoomCode}`));
+}
+async function changeRoomCode() {
+  if (!currentGameState || currentGameState.host !== myPlayerId || !roomRef || !db) return;
+  const nextCode = prompt('Nuevo código de invitación (4 a 6 caracteres):', currentRoomCode);
+  if (nextCode === null) return;
+  const clean = nextCode.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,6}$/.test(clean)) { alert('El código debe tener 4 a 6 caracteres.'); return; }
+  if (clean === currentRoomCode) return;
+  try {
+    const oldCode = currentRoomCode;
+    const oldRef = roomRef;
+    const newRef = db.ref(`rooms/${clean}`);
+    if ((await newRef.once('value')).exists()) { alert('Ese código ya está ocupado.'); return; }
+    const copy = JSON.parse(JSON.stringify(currentGameState));
+    delete copy.redirectCode;
+    copy.code = clean;
+    await newRef.set(copy);
+    await oldRef.update({redirectCode: clean});
+    currentRoomCode = clean;
+    roomRef = newRef;
+    await roomRef.child(`players/${myPlayerId}`).onDisconnect().remove().catch(()=>{});
+    listenToRoom();
+    listenToChat();
+    const display = document.getElementById('lobby-code-display');
+    if (display) display.innerText = clean;
+    showToastNotification(`🔑 Código cambiado a ${clean}.`);
+    setTimeout(() => oldRef.remove().catch(()=>{}), 10000);
+  } catch (error) { console.error(error); alert(`No se pudo cambiar el código: ${error?.message || 'error desconocido'}`); }
+}
+async function leaveRoom() {
+  if (!currentRoomCode) return;
+  if (!confirm('¿Quieres salir de la sala?')) return;
+  try {
+    if (roomRef) await roomRef.child(`players/${myPlayerId}`).remove();
+  } catch (error) { console.warn(error); }
+  returnToSetup();
+}
+function listenToChat() {
+  if (
+    !currentRoomCode ||
+    !isFirebaseConnected ||
+    !db
+  ) {
+    return;
+  }
+  chatRef =
+    db.ref(
+      'chats/' +
+      currentRoomCode
+    );
+  chatRef.on(
+    'child_added',
+    snapshot => {
+      const msgData =
+        snapshot.val();
+      renderL4DMessage(
+        msgData
+      );
+      renderLobbyMessage(
+        msgData
+      );
+      if (
+        msgData.sender === 'SISTEMA' &&
+        msgData.text &&
+        msgData.text.includes(
+          'abandonó'
+        )
+      ) {
+        showToastNotification(
+          msgData.text
+        );
+      }
+    }
+  );
+}
+function handleLobbyChatKey(event) {
+  if (
+    event.key !== 'Enter'
+  ) {
+    return;
+  }
+  const input =
+    document.getElementById(
+      'lobby-chat-input'
+    );
+  if (!input) {
+    return;
+  }
+  const text =
+    input.value.trim();
+  if (!text) {
+    return;
+  }
+  if (
+    isFirebaseConnected &&
+    db &&
+    currentRoomCode
+  ) {
+    db.ref(
+      'chats/' +
+      currentRoomCode
+    ).push({
+      sender:
+        myPlayerName,
+      text
+    });
+  } else {
+    renderLobbyMessage({
+      sender:
+        myPlayerName,
+      text
+    });
+  }
+  input.value = '';
+}
+function renderLobbyMessage(
+  msgData
+) {
+  const container =
+    document.getElementById(
+      'lobby-chat-messages'
+    );
+  if (!container) {
+    return;
+  }
+  const msgEl =
+    document.createElement(
+      'div'
+    );
+  msgEl.className =
+    'chat-msg';
+  msgEl.innerHTML =
+    `<b>${msgData.sender}:</b> ${msgData.text}`;
+  container.appendChild(
+    msgEl
+  );
+  container.scrollTop =
+    container.scrollHeight;
+}
+function handleChatKey(event) {
+  if (
+    event.key !== 'Enter'
+  ) {
+    return;
+  }
+  const input =
+    document.getElementById(
+      'l4d-chat-input'
+    );
+  if (!input) {
+    return;
+  }
+  const text =
+    input.value.trim();
+  if (!text) {
+    return;
+  }
+  if (
+    isFirebaseConnected &&
+    db &&
+    currentRoomCode
+  ) {
+    db.ref(
+      'chats/' +
+      currentRoomCode
+    ).push({
+      sender:
+        myPlayerName,
+      text
+    });
+  } else {
+    renderL4DMessage({
+      sender:
+        myPlayerName,
+      text
+    });
+  }
+  input.value = '';
+}
+function renderL4DMessage(
+  msgData
+) {
+  const container =
+    document.getElementById(
+      'l4d-chat-messages'
+    );
+  if (!container) {
+    return;
+  }
+  const msgEl =
+    document.createElement(
+      'div'
+    );
+  msgEl.className =
+    'chat-msg';
+  msgEl.innerHTML =
+    `<b>${msgData.sender}:</b> ${msgData.text}`;
+  container.appendChild(
+    msgEl
+  );
+  container.scrollTop =
+    container.scrollHeight;
+}
 async function toggleMicrophone() {
   const btn=document.getElementById('btn-mic-toggle');
   const text=document.getElementById('mic-status-text');
@@ -679,7 +933,6 @@ async function flushPendingIce(playerId){
 }
 
 function startGame() {
-  if (!currentGameState || currentGameState.host !== myPlayerId) return;
   if (!currentGameState) {
     return;
   }
@@ -759,6 +1012,8 @@ function updateUI() {
     showScreen(
       'screen-lobby'
     );
+    const lobbyCode=document.getElementById('lobby-code-display');
+    if(lobbyCode)lobbyCode.innerText=currentGameState.inviteCode||currentRoomCode;
     const playersArr =
       Object.values(
         currentGameState.players ||
@@ -777,39 +1032,13 @@ function updateUI() {
         'lobby-players-list'
       );
     if (lobby) {
-      lobby.innerHTML =
-        playersArr
-          .map(
-            player => `
-              <div class="lobby-player-card">
-                <img
-                  src="${player.avatar}"
-                  class="lobby-player-avatar"
-                  alt="${player.name}"
-                >
-                <div
-                  class="text-center"
-                  style="width:100%;"
-                >
-                  <div
-                    class="lobby-player-name"
-                  >
-                    ${player.name}
-                  </div>
-                  <div
-                    class="lobby-player-skill"
-                  >
-                    ${player.skill}
-                  </div>
-                </div>
-              </div>
-            `
-          )
-          .join('');
+      lobby.innerHTML=playersArr.map(player=>`<div class="lobby-player-card animated-lobby-avatar"><div class="lobby-avatar-wrap"><img src="${player.avatar||'./assets/foto1.jpeg'}" class="lobby-player-avatar animated-avatar" alt="${player.name}"></div><div class="text-center" style="width:100%;"><div class="lobby-player-name">${player.name}${currentGameState.host===player.id?' 👑':''}</div><div class="lobby-player-skill">${player.skill||''}</div></div></div>`).join('');
     }
-    const isHost =
-      currentGameState.host ===
-      myPlayerId;
+    const isHost = currentGameState.host === myPlayerId;
+    const hostEditor=document.getElementById('host-room-editor');
+    if(hostEditor)hostEditor.classList.toggle('hidden',!isHost);
+    const transferNotice=document.getElementById('host-transfer-notice');
+    if(transferNotice)transferNotice.classList.toggle('hidden',!isHost);
     const startButton =
       document.getElementById(
         'btn-start-game'
@@ -1009,16 +1238,30 @@ function renderGameBoard() {
   renderMyHand(
     isMyTurn
   );
-  const relief=document.getElementById('hand-relief-btn');
-  if(relief)relief.classList.toggle('hidden',!isMyTurn||((currentGameState.players?.[myPlayerId]?.hand||[]).length<HAND_HELP_THRESHOLD));
   updateSkillDisplay();
 }
-function renderOpponentsQuadrant(turnPlayerId){
-  const zones={top:document.getElementById('opponents-top'),left:document.getElementById('opponents-left'),right:document.getElementById('opponents-right')};if(!zones.top||!zones.left||!zones.right)return;Object.values(zones).forEach(zone=>zone.innerHTML='');
-  const order=currentGameState.turnOrder||[];const myIndex=order.indexOf(myPlayerId);const opponents=Object.values(currentGameState.players||{}).filter(player=>player.id!==myPlayerId);const positions=[];
-  if(myIndex>=0){[order[(myIndex+1)%order.length],order[(myIndex+2)%order.length],order[(myIndex-1+order.length)%order.length]].forEach(id=>{if(id&&id!==myPlayerId&&!positions.includes(id))positions.push(id);});}
-  opponents.forEach(player=>{if(!positions.includes(player.id))positions.push(player.id);});
-  positions.slice(0,3).forEach((id,index)=>{const player=currentGameState.players[id];if(!player)return;const isTurn=player.id===turnPlayerId;const cardCount=(player.hand||[]).length;const backs=Math.min(cardCount,5);const oppEl=document.createElement('div');oppEl.className=`opponent-mini-card ${isTurn?'active-turn':''}`;oppEl.innerHTML=`<img src="${escapeHtml(player.avatar||'./assets/foto1.jpeg')}" class="opp-avatar" alt="${escapeHtml(player.name)}"><div class="opp-details"><div class="opp-name">${escapeHtml(player.name)}</div><div class="opp-count">${cardCount} cartas</div><div class="opp-card-backs">${Array.from({length:backs},()=>'<span class="mini-card-back">UNO</span>').join('')}</div></div>`;(index===0?zones.left:index===1?zones.top:zones.right).appendChild(oppEl);});
+function renderOpponentsQuadrant(turnPlayerId) {
+  const zoneTop = document.getElementById('opponents-top');
+  const zoneLeft = document.getElementById('opponents-left');
+  const zoneRight = document.getElementById('opponents-right');
+  if (!zoneTop || !zoneLeft || !zoneRight) return;
+  zoneTop.innerHTML = '';
+  zoneLeft.innerHTML = '';
+  zoneRight.innerHTML = '';
+  const opponents = Object.values(currentGameState.players || {}).filter(player => player.id !== myPlayerId);
+  const zones = [zoneLeft, zoneTop, zoneRight];
+  const positions = ['left', 'top', 'right'];
+  opponents.slice(0,3).forEach((player,index) => {
+    const isTurn = player.id === turnPlayerId;
+    const hand = player.hand || [];
+    const cardCount = hand.length;
+    const oppEl = document.createElement('div');
+    oppEl.className = `opponent-mini-card position-${positions[index]} ${isTurn ? 'active-turn' : ''}`;
+    const visibleCount = Math.min(cardCount, 7);
+    const backs = Array.from({length: visibleCount}, (_,i) => `<span class="mini-card-back" style="--i:${i}"></span>`).join('');
+    oppEl.innerHTML = `<img src="${player.avatar || './assets/foto1.jpeg'}" class="opp-avatar" alt="${player.name || 'Jugador'}"><div class="opp-name">${player.name || 'Jugador'}</div><div class="opponent-cards">${backs}</div><div class="opp-card-count">${cardCount} ${cardCount===1?'carta':'cartas'}${isTurn?' · SU TURNO':''}</div>`;
+    zones[index].appendChild(oppEl);
+  });
 }
 function renderMyHand(
   isMyTurn
@@ -1107,8 +1350,6 @@ function playCard(
   }
   const topCard =
     currentGameState.topCard;
-  const currentHand = currentGameState.players[myPlayerId].hand || [];
-  if (currentHand.length === 1) { applyLastCardPenalty(); return; }
   const stack =
     currentGameState.stack ||
     0;
@@ -1194,8 +1435,6 @@ function selectColor(
     card
   );
 }
-function applyLastCardPenalty(){const player=currentGameState?.players?.[myPlayerId];if(!player)return;let deck=[...(currentGameState.deck||[])];const hand=[...(player.hand||[])];for(let i=0;i<10;i++){if(!deck.length)deck=generateDeck();hand.push(deck.pop());}player.hand=hand;currentGameState.deck=deck;showToastNotification('🚫 ¡No puedes ganar con la última carta! Castigo: +10 cartas.');if(roomRef)roomRef.update(currentGameState);else updateUI();}
-function applyHandRelief(){const player=currentGameState?.players?.[myPlayerId];if(!player||(player.hand||[]).length<HAND_HELP_THRESHOLD)return;if(currentGameState.turnOrder?.[currentGameState.currentTurnIndex]!==myPlayerId){alert('La ayuda de mano solo puede usarse durante tu turno.');return;}const amount=player.hand.length>=20?4:2;player.hand=[...(player.hand||[])];for(let i=0;i<amount&&player.hand.length>1;i++)player.hand.splice(Math.floor(Math.random()*player.hand.length),1);showToastNotification(`🧹 Ayuda de mano: -${amount} cartas.`);if(roomRef)roomRef.update({[`players/${myPlayerId}/hand`]:player.hand});else updateUI();}
 function executeCardEffect(
   card
 ) {
@@ -1251,7 +1490,25 @@ function executeCardEffect(
         myPlayerId
       ]
       .hand;
-  if (myHand.length === 0) { applyLastCardPenalty(); return; }
+  if (
+    myHand.length === 0
+  ) {
+    currentGameState.status =
+      'finished';
+    currentGameState.winnerName =
+      myPlayerName;
+    saveWinnerToHistory(
+      myPlayerName
+    );
+    if (roomRef) {
+      roomRef.update(
+        currentGameState
+      );
+    } else {
+      updateUI();
+    }
+    return;
+  }
   nextTurn(
     skipTurn
   );
@@ -1547,7 +1804,7 @@ function handleLlamaClick() {
     hand.length === 1
   ) {
     alert(
-      '⚠️ ¡ABUSO DE MASCOTA DETECTADO! Recibes un castigo de 10 cartas.'
+      '⚠️ ¡ABUSO DE MASCOTA DETECTADO! Recibes un castigo de 20 cartas.'
     );
     let deck =
       [
@@ -1556,7 +1813,7 @@ function handleLlamaClick() {
       ];
     for (
       let i = 0;
-      i < 10;
+      i < 20;
       i++
     ) {
       if (
@@ -1883,12 +2140,6 @@ function useSpecialSkill() {
       updateUI();
     }
   }
-}
-function updateMatchSkillPanel(){
-  const uses=currentGameState?.players?.[myPlayerId]?.skillUses ?? MAX_SKILL_USES;
-  updateText('match-skill-count',uses);
-  updateText('match-skill-count-panel',uses);
-  updateText('skill-button-count',uses);
 }
 function updateSkillDisplay() {
   let uses =
