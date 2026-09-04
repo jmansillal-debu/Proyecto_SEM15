@@ -3,100 +3,55 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>UNO - Multijugador</title>
+<title>UNO Multijugador</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
+<div class="ambient ambient-one"></div><div class="ambient ambient-two"></div><div class="ambient ambient-three"></div>
 <div id="system-notification" class="toast hidden"><span id="toast-message"></span></div>
-<div id="pets-roaming-layer" class="pets-hidden">
-  <div id="bad-pet" class="roaming-pet" onclick="handleLlamaClick()">🦙 <span id="llama-clicks" class="click-badge">0</span></div>
-  <div id="good-pet" class="roaming-pet" onclick="handleGoodPetClick()">🦜 <span id="loro-clicks" class="click-badge">0</span></div>
+<div id="pets-roaming-layer" class="pets-hidden"><div id="bad-pet" class="roaming-pet pet-bad" onclick="handleLlamaClick()">🦙<span id="llama-clicks" class="click-badge">0</span></div><div id="good-pet" class="roaming-pet pet-good" onclick="handleGoodPetClick()">🦜<span id="loro-clicks" class="click-badge">0</span></div></div>
+<section id="screen-setup" class="screen active login-screen">
+<div class="login-brand"><div class="brand-mark">UNO</div><div><span class="eyebrow">MULTIPLAYER ARENA</span><h1 class="game-title">UNO <span>ONLINE</span></h1><p>Construye tu perfil, elige tu héroe y entra a la mesa.</p></div></div>
+<div class="login-layout">
+<div class="login-main card">
+<div class="section-top"><div><span class="eyebrow">PASO 01 · PERFIL</span><h2>Identidad del jugador</h2><p>Tu perfil se guarda en este navegador para que puedas volver rápidamente.</p></div><div class="live-pill"><i></i> EN LÍNEA</div></div>
+<div class="profile-editor">
+<div class="profile-preview-large"><img id="profile-photo-preview" src="./assets/foto1.jpeg" alt="Vista previa"><span class="profile-level">LV. 1</span></div>
+<div class="profile-fields">
+<div class="form-group"><label for="player-name-input">APODO</label><input type="text" id="player-name-input" placeholder="Escribe tu nombre..." maxlength="15" autocomplete="nickname"><small class="input-hint">Máximo 15 caracteres.</small></div>
+<div class="profile-upload"><span>📷</span><div class="profile-upload-info"><strong>Foto personalizada</strong><small>JPG, PNG o WEBP · se comprime automáticamente</small></div><label for="profile-photo-input">Cambiar</label><input id="profile-photo-input" type="file" accept="image/*" onchange="handleProfilePhotoUpload(event)"></div>
+</div></div>
+<div class="section-top character-head"><div><span class="eyebrow">PASO 02 · HÉROE</span><h2>Elige tu personaje</h2></div><span class="small-badge">3 usos por partida</span></div>
+<div class="hero-picker">
+<div class="hero-card avatar-card selected" onclick="selectAvatar(this,'./assets/foto1.jpeg','Escudo Táctico','Anula completamente la acumulación de cartas suma activas.')"><div class="hero-art"><img src="./assets/foto1.jpeg" class="avatar-img"><span class="hero-glow"></span></div><div class="hero-meta"><strong>Escudo</strong><small>DEFENSA</small></div><div class="hero-skill">🛡️ Anula el pozo acumulado.</div></div>
+<div class="hero-card avatar-card" onclick="selectAvatar(this,'./assets/foto2.jfif','Espionaje','Revela las cartas de la mano del rival.')"><div class="hero-art"><img src="./assets/foto2.jfif" class="avatar-img"><span class="hero-glow"></span></div><div class="hero-meta"><strong>Visión</strong><small>CONTROL</small></div><div class="hero-skill">👁️ Revela las manos rivales.</div></div>
+<div class="hero-card avatar-card" onclick="selectAvatar(this,'./assets/foto3.jfif','Robo Rápido','Inserta una carta +4 extra a la pila de la mesa.')"><div class="hero-art"><img src="./assets/foto3.jfif" class="avatar-img"><span class="hero-glow"></span></div><div class="hero-meta"><strong>Suma+</strong><small>ATAQUE</small></div><div class="hero-skill">⚡ Agrega +4 al pozo.</div></div>
+<div class="hero-card avatar-card" onclick="selectAvatar(this,'./assets/foto4.jfif','Purga Directa','Elimina automáticamente 2 cartas aleatorias de tu mano.')"><div class="hero-art"><img src="./assets/foto4.jfif" class="avatar-img"><span class="hero-glow"></span></div><div class="hero-meta"><strong>Purga</strong><small>ESTRATEGIA</small></div><div class="hero-skill">🔥 Elimina 2 cartas.</div></div>
 </div>
-<section id="screen-setup" class="screen active">
-  <h1 class="game-title">UNO MULTIJUGADOR</h1>
-  <div class="setup-layout-grid">
-    <div class="card setup-card text-left">
-      <div class="card-heading"><div class="heading-icon">⚙️</div><div><h2 class="section-subtitle">Ajustes del Jugador</h2><p class="section-description">Crea tu perfil y entra a una sala.</p></div></div>
-      <div class="form-group">
-        <label for="player-name-input">Apodo</label>
-        <input type="text" id="player-name-input" placeholder="Tu nombre aquí..." maxlength="15">
-      </div>
-      <div class="form-group">
-        <div class="label-row"><label>Personaje</label><span class="small-badge">3 usos por partida</span></div>
-        <div class="avatar-picker">
-          <div class="avatar-card selected" onclick="selectAvatar(this,'./assets/foto1.jpeg','Escudo Táctico','Anula completamente la acumulación de cartas suma activas.')"><div class="avatar-image-wrap"><img src="./assets/foto1.jpeg" class="avatar-img"></div><span class="avatar-tag">Escudo</span></div>
-          <div class="avatar-card" onclick="selectAvatar(this,'./assets/foto2.jfif','Espionaje','Revela las cartas de la mano del rival.')"><div class="avatar-image-wrap"><img src="./assets/foto2.jfif" class="avatar-img"></div><span class="avatar-tag">Visión</span></div>
-          <div class="avatar-card" onclick="selectAvatar(this,'./assets/foto3.jfif','Robo Rápido','Inserta una carta +4 extra a la pila de la mesa.')"><div class="avatar-image-wrap"><img src="./assets/foto3.jfif" class="avatar-img"></div><span class="avatar-tag">Suma+</span></div>
-          <div class="avatar-card" onclick="selectAvatar(this,'./assets/foto4.jfif','Purga Directa','Elimina automáticamente 2 cartas aleatorias de tu mano.')"><div class="avatar-image-wrap"><img src="./assets/foto4.jfif" class="avatar-img"></div><span class="avatar-tag">Purga</span></div>
-        </div>
-        <div class="profile-upload">
-          <img id="profile-photo-preview" src="./assets/foto1.jpeg" alt="Vista previa">
-          <div class="profile-upload-info"><strong>📸 Foto propia</strong><small>Se guarda en este navegador y se comparte con tu perfil.</small></div>
-          <label for="profile-photo-input">Elegir foto</label>
-          <input id="profile-photo-input" type="file" accept="image/*" onchange="handleProfilePhotoUpload(event)">
-        </div>
-        <div class="skill-info-container"><div class="skill-info-title">HABILIDAD SELECCIONADA</div><p id="skill-description" class="skill-info"><b>Habilidad:</b> Anula completamente la acumulación de cartas suma activas.</p><div class="skill-use-preview"><span>Usos disponibles</span><strong id="skill-uses-display">3</strong></div></div>
-      </div>
-      <div class="action-buttons">
-        <button class="ui-btn primary" onclick="createRoom()">Crear Nueva Sala</button>
-        <div class="join-divider">O ÚNETE A UNA SALA</div>
-        <div class="join-group"><input type="text" id="room-code-input" placeholder="CÓDIGO" maxlength="6"><button class="ui-btn secondary" onclick="joinRoom()">Unirse</button></div>
-      </div>
-    </div>
-    <div class="card instructions-card text-left">
-      <div class="card-heading"><div class="heading-icon blue">📖</div><div><h2 class="section-subtitle">Reglas rápidas</h2><p class="section-description">Todo lo necesario antes de empezar.</p></div></div>
-      <div class="rule-list">
-        <div class="rule-item"><div class="rule-number">01</div><div><strong>Objetivo</strong><p>Descarta todas tus cartas antes que los demás.</p></div></div>
-        <div class="rule-item"><div class="rule-number">02</div><div><strong>Mesa</strong><p>Coincide el color o el valor de la carta activa.</p></div></div>
-        <div class="rule-item"><div class="rule-number">03</div><div><strong>Habilidad</strong><p>Cada jugador tiene 3 usos durante la partida.</p></div></div>
-      </div>
-      <h3 class="mini-section-title">🐾 Mascotas</h3>
-      <div class="pet-rule-box">
-        <div class="pet-rule"><span class="pet-rule-icon">🦙</span><div><strong>Llama Mala · 40 clics</strong><p>Entrega una carta +4. Si tienes 1 carta, aplica 20 cartas de castigo.</p></div></div>
-        <div class="pet-rule"><span class="pet-rule-icon">🦜</span><div><strong>Loro Bueno · 10 clics</strong><p>Quita 1 carta. Con 2 cartas puede dejarte en 1; con 1 carta no puede eliminarla.</p></div></div>
-      </div>
-      <div class="tip-box"><span>💡</span><div><strong>Consejo</strong><p>La foto, nombre y habilidad quedan asociados a tu registro de jugador.</p></div></div>
-    </div>
-  </div>
-  <div class="history-container text-left">
-    <div class="history-box"><div class="history-heading"><span>🏆</span><div><h3>Campeones recientes</h3><small>Últimos ganadores</small></div></div><ul id="winners-history-list"></ul></div>
-    <div class="history-box"><div class="history-heading"><span>👤</span><div><h3>Registro de jugadores</h3><small>Perfiles utilizados</small></div></div><ul id="all-players-history-list"></ul></div>
-  </div>
+<div class="skill-info-container"><div><span class="skill-info-title">HABILIDAD ACTIVA</span><p id="skill-description" class="skill-info"><b>Escudo Táctico:</b> Anula completamente la acumulación de cartas suma activas.</p></div><div class="skill-use-preview"><span>USOS</span><strong id="skill-uses-display">3</strong></div></div>
+<div class="room-actions"><button class="ui-btn primary big-action" onclick="createRoom()"><span>＋</span> CREAR SALA</button><div class="join-box"><div><span class="eyebrow">¿YA TIENES CÓDIGO?</span><input type="text" id="room-code-input" placeholder="ABC123" maxlength="6" autocomplete="off"></div><button class="ui-btn secondary" onclick="joinRoom()">ENTRAR</button></div></div>
+<div class="connection-status"><span id="firebase-status-dot"></span><span id="firebase-status-text">Conectando al servidor...</span></div>
+</div>
+<aside class="login-side">
+<div class="feature-card card"><span class="eyebrow">TU PROGRESO</span><div class="feature-stat"><strong>🏆</strong><div><b>Historial</b><small>Campeones y perfiles recientes</small></div></div><div class="feature-stat"><strong>🐾</strong><div><b>Mascotas</b><small>Llama 40 clics · Loro 10 clics</small></div></div><div class="feature-stat"><strong>⚡</strong><div><b>Habilidades</b><small>3 usos por partida</small></div></div></div>
+<div class="card quick-rules"><span class="eyebrow">ANTES DE JUGAR</span><h3>Reglas rápidas</h3><div class="rule-line"><b>01</b><span>Combina color o valor con la carta activa.</span></div><div class="rule-line"><b>02</b><span>Si existe un pozo +2/+4, debes responder o robar.</span></div><div class="rule-line"><b>03</b><span>Gana quien se queda sin cartas jugando la última.</span></div><div class="pet-mini"><span>🦙</span><div><b>Llama Mala</b><small>40 clics → +4. Con 1 carta → castigo de 20.</small></div></div><div class="pet-mini"><span>🦜</span><div><b>Loro Bueno</b><small>10 clics → quita 1 carta. Nunca gana por ti.</small></div></div></div>
+</aside></div>
+<div class="history-container text-left"><div class="history-box"><div class="history-heading"><span>🏆</span><div><h3>Campeones recientes</h3><small>Últimas victorias</small></div></div><ul id="winners-history-list"></ul></div><div class="history-box"><div class="history-heading"><span>👤</span><div><h3>Registro de jugadores</h3><small>Perfiles utilizados</small></div></div><ul id="all-players-history-list"></ul></div></div>
 </section>
-<section id="screen-lobby" class="screen">
-  <div class="card lobby-header text-left"><div><span class="eyebrow">SALA PRIVADA</span><h2>Código: <span id="lobby-code-display" class="room-code">------</span> <button class="room-copy-btn" onclick="copyInviteCode()">⧉ Copiar</button></h2><p class="muted-text">Comparte este código con tus amigos.</p><div id="host-room-editor" class="host-room-editor hidden"><input id="new-room-code-input" maxlength="6" placeholder="NUEVO CÓDIGO"><button class="ui-btn secondary" onclick="changeRoomCode()">Cambiar código</button></div></div><div class="room-counter"><span>JUGADORES</span><strong id="player-count">0</strong><small>/4</small></div></div>
-  <div class="section-header"><h3>Jugadores</h3><div class="live-indicator"><i></i> EN LÍNEA</div></div>
-  <div id="lobby-players-list" class="lobby-grid"></div><div id="host-transfer-notice" class="host-transfer-notice hidden"></div>
-  <div id="waiting-msg-container" class="card waiting-card text-left"><div class="waiting-icon">⏳</div><div><strong>Esperando al anfitrión</strong><p>El anfitrión puede iniciar la partida cuando esté listo.</p></div></div>
-  <div class="lobby-actions"><button id="btn-start-game" class="ui-btn primary huge start-game-btn" style="display:none" onclick="startGame()">¡EMPEZAR JUEGO!</button><button class="ui-btn danger leave-room-btn" onclick="leaveRoom()">Salir de la sala</button></div>
-  <div class="chat-container lobby-chat"><div class="chat-header"><div><span class="chat-icon">💬</span><div><strong>Chat del lobby</strong><small>Mensajes del grupo</small></div></div><span class="chat-status">EN VIVO</span></div><div id="lobby-chat-messages" class="chat-box"></div><div class="chat-input-row"><input type="text" id="lobby-chat-input" placeholder="Escribe un mensaje..." onkeypress="handleLobbyChatKey(event)"><button class="chat-send-btn" onclick="handleLobbyChatKey({key:'Enter'})">➤</button></div></div>
+<section id="screen-lobby" class="screen lobby-screen">
+<div class="lobby-top card"><div><span class="eyebrow">SALA PRIVADA</span><h2>Código <span id="lobby-code-display" class="room-code">------</span></h2><p class="muted-text">Comparte el código con tus amigos.</p></div><div class="lobby-top-actions"><button class="icon-btn" onclick="copyRoomCode()" title="Copiar código">⧉</button><button id="edit-room-btn" class="icon-btn host-only" onclick="changeRoomCode()" title="Editar código">✎</button><button class="icon-btn danger" onclick="leaveRoom()" title="Salir">×</button><div class="room-counter"><span>JUGADORES</span><strong id="player-count">0</strong><small>/4</small></div></div></div>
+<div class="lobby-layout"><div class="lobby-main"><div class="section-header"><div><span class="eyebrow">TU ESCUADRÓN</span><h3>Jugadores conectados</h3></div><div class="live-indicator"><i></i> EN VIVO</div></div><div id="lobby-players-list" class="lobby-grid"></div><div id="waiting-msg-container" class="card waiting-card text-left"><div class="waiting-icon">⏳</div><div><strong>Esperando al anfitrión</strong><p>Cuando el anfitrión esté listo podrá iniciar la partida.</p></div></div><button id="btn-start-game" class="ui-btn primary huge start-game-btn" style="display:none" onclick="startGame()">▶ EMPEZAR JUEGO</button></div>
+<aside class="lobby-sidebar"><div class="card lobby-guide"><div class="panel-title"><span>📘</span><div><strong>Cómo se juega</strong><small>Guía rápida</small></div></div><div class="guide-step"><b>1</b><span>Juega una carta del mismo color o valor.</span></div><div class="guide-step"><b>2</b><span>Usa tu habilidad durante tu turno.</span></div><div class="guide-step"><b>3</b><span>Las mascotas aparecen durante la partida.</span></div><div class="guide-step"><b>4</b><span>Quédate sin cartas para ganar.</span></div></div><div class="card lobby-pets"><div class="panel-title"><span>🐾</span><div><strong>Mascotas</strong><small>Funciones especiales</small></div></div><div class="pet-guide-row"><span>🦙</span><div><b>Llama · 40</b><small>Te entrega +4. Con 1 carta activa el castigo.</small></div></div><div class="pet-guide-row"><span>🦜</span><div><b>Loro · 10</b><small>Elimina 1 carta, pero nunca la última.</small></div></div></div></aside></div>
+<div class="chat-container lobby-chat"><div class="chat-header"><div><span class="chat-icon">💬</span><div><strong>Chat de la sala</strong><small>Habla con tu equipo</small></div></div><span class="chat-status">EN VIVO</span></div><div id="lobby-chat-messages" class="chat-box"></div><div class="chat-input-row"><input type="text" id="lobby-chat-input" placeholder="Escribe un mensaje..." onkeypress="handleLobbyChatKey(event)"><button class="chat-send-btn" onclick="handleLobbyChatKey({key:'Enter'})">➤</button></div></div>
 </section>
-<section id="screen-game" class="screen">
-  <header class="game-header text-left">
-    <div class="player-profile-badge"><div class="profile-avatar-ring"><img id="my-avatar-display" src="./assets/foto1.jpeg" alt="Mi Avatar"><span class="online-dot"></span></div><div><span id="my-name-display" class="profile-name">Jugador</span><small id="my-skill-display" class="profile-skill">Habilidad</small></div></div>
-    <div class="turn-indicator-box"><small>TURNO ACTUAL</small><strong id="turn-display">---</strong><span class="timer-pill">⏳ <span id="timer-display">10</span>s</span></div>
-    <div class="voice-controls"><button id="btn-mic-toggle" class="mic-chat-btn btn-mic-off" onclick="toggleMicrophone()">🎤 <span id="mic-status-text">Off</span></button></div>
-  </header>
-  <div class="game-status-banner"><div class="status-item"><span class="status-dot"></span><span>Partida en vivo</span></div><span class="status-divider"></span><div class="status-item">🃏 <span id="header-card-count">0</span> cartas</div><span class="status-divider"></span><div class="status-item">⚡ <span id="match-skill-count">3</span> habilidades</div></div>
-  <div class="game-board realistic-table">
-    <div id="opponents-top" class="opponents-row table-seat seat-top"></div>
-    <div class="middle-row">
-      <div id="opponents-left" class="opponents-col table-seat seat-left"></div>
-      <div class="center-table">
-        <div class="table-zone deck-pile" onclick="drawCardCurrentPlayer()"><span class="zone-label">ROBAR</span><div class="uno-card card-back"><span>UNO</span></div></div>
-        <div class="table-zone played-pile"><span class="zone-label">MESA</span><div id="top-card" class="uno-card c-rojo"><span class="card-corner">-</span><div class="card-inner">-</div></div></div>
-        <div class="table-info-zone"><div class="table-info-card"><span class="info-symbol">🎨</span><div><small>COLOR</small><strong id="active-color-text">Rojo</strong><em><span id="active-color-indicator" class="color-badge c-rojo"></span>Activo</em></div></div><div class="table-info-card"><span class="info-symbol">➕</span><div><small>POZO</small><strong id="stack-display">+0</strong><em>Acumulado</em></div></div></div>
-      </div>
-      <div id="opponents-right" class="opponents-col table-seat seat-right"></div>
-    </div>
-  </div>
-  <footer class="game-footer">
-    <div class="action-bar"><button class="ui-btn skill-btn" onclick="useSpecialSkill()">⚡ Habilidad <span id="skill-button-count">3</span></button><button class="ui-btn uno-btn" onclick="sayUno()">🔥 UNO! (<span id="my-card-count">0</span>)</button></div>
-    <div class="hand-panel"><div class="hand-panel-header"><h3>🃏 Tu mano</h3><div class="hand-counter"><strong id="hand-card-counter">0</strong><small>cartas</small></div></div><div id="my-hand" class="hand-container"></div><div class="hand-help-text">Haz clic en una carta para jugarla cuando sea tu turno.</div></div>
-    <div class="game-bottom-grid"><div class="in-game-chat compact-chat"><div class="chat-header"><div><span class="chat-icon">💬</span><div><strong>Chat</strong><small>Grupo de la partida</small></div></div><span class="chat-status">EN VIVO</span></div><div id="l4d-chat-messages" class="chat-box game-chat-box"></div><div class="chat-input-row"><input type="text" id="l4d-chat-input" placeholder="Enviar mensaje..." onkeypress="handleChatKey(event)"><button class="chat-send-btn" onclick="handleChatKey({key:'Enter'})">➤</button></div></div><div class="match-info-panel"><div class="panel-title"><span>📊</span><div><strong>Estado</strong><small>Resumen rápido</small></div></div><div class="match-stat-row"><span>Tus cartas</span><strong id="match-hand-count">0</strong></div><div class="match-stat-row"><span>Pozo</span><strong id="match-stack-count">+0</strong></div><div class="match-stat-row"><span>Habilidad</span><strong id="match-skill-count">3</strong></div></div></div>
-  </footer>
+<section id="screen-game" class="screen game-screen">
+<header class="game-header text-left"><div class="player-profile-badge"><div class="profile-avatar-ring"><img id="my-avatar-display" src="./assets/foto1.jpeg" alt="Mi Avatar"><span class="online-dot"></span></div><div><span id="my-name-display" class="profile-name">Jugador</span><small id="my-skill-display" class="profile-skill">Habilidad</small></div></div><div class="turn-indicator-box"><small>TURNO ACTUAL</small><strong id="turn-display">---</strong><span class="timer-pill">⏳ <span id="timer-display">10</span>s</span></div><div class="voice-controls"><button id="btn-mic-toggle" class="mic-chat-btn btn-mic-off" onclick="toggleMicrophone()">🎤 <span id="mic-status-text">Off</span></button></div></header>
+<div class="game-status-banner"><div class="status-item"><span class="status-dot"></span><span>Partida en vivo</span></div><span class="status-divider"></span><div class="status-item">🃏 <span id="header-card-count">0</span> cartas</div><span class="status-divider"></span><div class="status-item">⚡ <span id="match-skill-count">3</span> habilidades</div></div>
+<div class="game-board"><div id="opponents-top" class="opponents-row"></div><div class="middle-row"><div id="opponents-left" class="opponents-col"></div><div class="center-table"><div class="table-zone deck-pile" onclick="drawCardCurrentPlayer()"><span class="zone-label">ROBAR</span><div class="uno-card card-back"><span>UNO</span></div></div><div class="table-zone played-pile"><span class="zone-label">MESA</span><div id="top-card" class="uno-card c-rojo"><span class="card-corner">-</span><div class="card-inner">-</div></div></div><div class="table-info-zone"><div class="table-info-card"><span class="info-symbol">🎨</span><div><small>COLOR</small><strong id="active-color-text">Rojo</strong><em><span id="active-color-indicator" class="color-badge c-rojo"></span>Activo</em></div></div><div class="table-info-card"><span class="info-symbol">➕</span><div><small>POZO</small><strong id="stack-display">+0</strong><em>Acumulado</em></div></div></div></div><div id="opponents-right" class="opponents-col"></div></div></div>
+<footer class="game-footer"><div class="action-bar"><button class="ui-btn skill-btn" onclick="useSpecialSkill()">⚡ Habilidad <span id="skill-button-count">3</span></button><button class="ui-btn uno-btn" onclick="sayUno()">🔥 UNO! (<span id="my-card-count">0</span>)</button></div><div class="hand-panel"><div class="hand-panel-header"><h3>🃏 Tu mano</h3><div class="hand-counter"><strong id="hand-card-counter">0</strong><small>cartas</small></div></div><div id="my-hand" class="hand-container"></div><div class="hand-help-text">Haz clic en una carta para jugarla cuando sea tu turno.</div></div><div class="game-bottom-grid"><div class="in-game-chat compact-chat"><div class="chat-header"><div><span class="chat-icon">💬</span><div><strong>Chat</strong><small>Grupo de la partida</small></div></div><span class="chat-status">EN VIVO</span></div><div id="l4d-chat-messages" class="chat-box game-chat-box"></div><div class="chat-input-row"><input type="text" id="l4d-chat-input" placeholder="Enviar mensaje..." onkeypress="handleChatKey(event)"><button class="chat-send-btn" onclick="handleChatKey({key:'Enter'})">➤</button></div></div><div class="match-info-panel"><div class="panel-title"><span>📊</span><div><strong>Estado</strong><small>Resumen rápido</small></div></div><div class="match-stat-row"><span>Tus cartas</span><strong id="match-hand-count">0</strong></div><div class="match-stat-row"><span>Pozo</span><strong id="match-stack-count">+0</strong></div><div class="match-stat-row"><span>Habilidad</span><strong id="match-skill-count">3</strong></div></div></div></footer>
 </section>
 <div id="color-modal" class="modal-overlay hidden"><div class="modal-body text-center"><div class="modal-icon">🎨</div><h3>Selecciona un color</h3><p class="modal-description">Elige el nuevo color para la carta especial.</p><div class="color-selector-grid"><button class="color-btn btn-rojo" onclick="selectColor('rojo')">Rojo</button><button class="color-btn btn-azul" onclick="selectColor('azul')">Azul</button><button class="color-btn btn-verde" onclick="selectColor('verde')">Verde</button><button class="color-btn btn-amarillo" onclick="selectColor('amarillo')">Amarillo</button></div></div></div>
 <div id="winner-modal" class="modal-overlay hidden"><div class="modal-body winner-modal-body"><div class="winner-icon">🏆</div><h1>¡FIN DE LA PARTIDA!</h1><p class="winner-label">El ganador es:</p><h2 id="winner-name-display" class="winner-name">Nombre del Jugador</h2><div class="winner-message">🎉 ¡Buena partida!</div><button class="ui-btn primary" onclick="returnToLobby()">Volver a la Sala</button></div></div>
