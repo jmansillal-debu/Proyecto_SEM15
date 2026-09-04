@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>UNO Multijugador</title>
+<title>UNO - Multijugador</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -66,11 +66,11 @@
   </div>
 </section>
 <section id="screen-lobby" class="screen">
-  <div class="card lobby-header text-left"><div><span class="eyebrow">SALA PRIVADA</span><h2>Código: <span id="lobby-code-display" class="room-code">------</span></h2><p class="muted-text">Comparte este código con tus amigos.</p></div><div class="room-counter"><span>JUGADORES</span><strong id="player-count">0</strong><small>/4</small></div></div>
+  <div class="card lobby-header text-left"><div><span class="eyebrow">SALA PRIVADA</span><h2>Código: <span id="lobby-code-display" class="room-code">------</span> <button class="room-copy-btn" onclick="copyInviteCode()">⧉ Copiar</button></h2><p class="muted-text">Comparte este código con tus amigos.</p><div id="host-room-editor" class="host-room-editor hidden"><input id="new-room-code-input" maxlength="6" placeholder="NUEVO CÓDIGO"><button class="ui-btn secondary" onclick="changeRoomCode()">Cambiar código</button></div></div><div class="room-counter"><span>JUGADORES</span><strong id="player-count">0</strong><small>/4</small></div></div>
   <div class="section-header"><h3>Jugadores</h3><div class="live-indicator"><i></i> EN LÍNEA</div></div>
-  <div id="lobby-players-list" class="lobby-grid"></div>
+  <div id="lobby-players-list" class="lobby-grid"></div><div id="host-transfer-notice" class="host-transfer-notice hidden"></div>
   <div id="waiting-msg-container" class="card waiting-card text-left"><div class="waiting-icon">⏳</div><div><strong>Esperando al anfitrión</strong><p>El anfitrión puede iniciar la partida cuando esté listo.</p></div></div>
-  <button id="btn-start-game" class="ui-btn primary huge start-game-btn" style="display:none" onclick="startGame()">¡EMPEZAR JUEGO!</button>
+  <div class="lobby-actions"><button id="btn-start-game" class="ui-btn primary huge start-game-btn" style="display:none" onclick="startGame()">¡EMPEZAR JUEGO!</button><button class="ui-btn danger leave-room-btn" onclick="leaveRoom()">Salir de la sala</button></div>
   <div class="chat-container lobby-chat"><div class="chat-header"><div><span class="chat-icon">💬</span><div><strong>Chat del lobby</strong><small>Mensajes del grupo</small></div></div><span class="chat-status">EN VIVO</span></div><div id="lobby-chat-messages" class="chat-box"></div><div class="chat-input-row"><input type="text" id="lobby-chat-input" placeholder="Escribe un mensaje..." onkeypress="handleLobbyChatKey(event)"><button class="chat-send-btn" onclick="handleLobbyChatKey({key:'Enter'})">➤</button></div></div>
 </section>
 <section id="screen-game" class="screen">
@@ -80,16 +80,16 @@
     <div class="voice-controls"><button id="btn-mic-toggle" class="mic-chat-btn btn-mic-off" onclick="toggleMicrophone()">🎤 <span id="mic-status-text">Off</span></button></div>
   </header>
   <div class="game-status-banner"><div class="status-item"><span class="status-dot"></span><span>Partida en vivo</span></div><span class="status-divider"></span><div class="status-item">🃏 <span id="header-card-count">0</span> cartas</div><span class="status-divider"></span><div class="status-item">⚡ <span id="match-skill-count">3</span> habilidades</div></div>
-  <div class="game-board">
-    <div id="opponents-top" class="opponents-row"></div>
+  <div class="game-board realistic-table">
+    <div id="opponents-top" class="opponents-row table-seat seat-top"></div>
     <div class="middle-row">
-      <div id="opponents-left" class="opponents-col"></div>
+      <div id="opponents-left" class="opponents-col table-seat seat-left"></div>
       <div class="center-table">
         <div class="table-zone deck-pile" onclick="drawCardCurrentPlayer()"><span class="zone-label">ROBAR</span><div class="uno-card card-back"><span>UNO</span></div></div>
         <div class="table-zone played-pile"><span class="zone-label">MESA</span><div id="top-card" class="uno-card c-rojo"><span class="card-corner">-</span><div class="card-inner">-</div></div></div>
         <div class="table-info-zone"><div class="table-info-card"><span class="info-symbol">🎨</span><div><small>COLOR</small><strong id="active-color-text">Rojo</strong><em><span id="active-color-indicator" class="color-badge c-rojo"></span>Activo</em></div></div><div class="table-info-card"><span class="info-symbol">➕</span><div><small>POZO</small><strong id="stack-display">+0</strong><em>Acumulado</em></div></div></div>
       </div>
-      <div id="opponents-right" class="opponents-col"></div>
+      <div id="opponents-right" class="opponents-col table-seat seat-right"></div>
     </div>
   </div>
   <footer class="game-footer">
